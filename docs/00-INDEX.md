@@ -15,6 +15,7 @@ For humans and AI agents. Start with 07 (what) → 01/02 (rules & success) → 1
 | [09-architecture.md](09-architecture.md) | System design and key rules |
 | [10-timeline.md](10-timeline.md) | Week-by-week plan to Nov 12 |
 | [11-demo-video-plan.md](11-demo-video-plan.md) | Shot list and narration draft |
+| [12-feature-backlog.md](12-feature-backlog.md) | Add-on features → skills, owners, order, reserved migrations |
 | [status.md](status.md) · [decisions.md](decisions.md) · [rulings.md](rulings.md) | Living logs |
 | [sandbox-activity.md](sandbox-activity.md) · [tooling.md](tooling.md) | Sandbox data ledger; installed plugins/MCP |
 
