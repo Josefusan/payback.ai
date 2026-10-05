@@ -1,0 +1,4 @@
+# Copy to .dev.vars (gitignored). Sandbox credentials only — https://developer.paypal.com/dashboard/ → Sandbox app
+PAYPAL_CLIENT_ID=your_sandbox_client_id
+PAYPAL_CLIENT_SECRET=your_sandbox_client_secret
+PAYPAL_WEBHOOK_ID=your_sandbox_webhook_id
