@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "payback",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Workers AI — Clef decision models (@cf/cloudflare/clef, @cf/cloudflare/clef-flash)
+  "ai": { "binding": "AI" },
+
+  // Ledger database. Create with: npx wrangler d1 create payback  → paste database_id below
+  "d1_databases": [
+    { "binding": "DB", "database_name": "payback", "database_id": "REPLACE_WITH_D1_DATABASE_ID", "migrations_dir": "migrations" }
+  ],
+
+  // Async processing of synced transactions and webhook events
+  "queues": {
+    "producers": [{ "binding": "SYNC_QUEUE", "queue": "payback-sync" }],
+    "consumers": [{ "queue": "payback-sync", "max_batch_size": 25, "max_batch_timeout": 5 }]
+  },
+
+  // Hourly incremental sync from PayPal Transaction Search
+  "triggers": { "crons": ["7 * * * *"] },
+
+  "vars": {
+    "PAYPAL_ENV": "sandbox",
+    "CLEF_MODEL": "@cf/cloudflare/clef-flash",
+    "CLEF_ESCALATION_MODEL": "@cf/cloudflare/clef",
+    "AUTO_POST_THRESHOLD": "0.90",
+    "ACTION_THRESHOLD": "0.95",
+    "AUTONOMOUS_PAYOUT_LIMIT_CENTS": "100000",
+    "AI_GATEWAY_ID": ""
+  }
+  // Secrets (never here): wrangler secret put PAYPAL_CLIENT_ID | PAYPAL_CLIENT_SECRET | PAYPAL_WEBHOOK_ID
+  // Local dev: copy .dev.vars.example → .dev.vars (gitignored)
+}
