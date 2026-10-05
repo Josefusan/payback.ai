@@ -15,3 +15,6 @@ Never edit product code or the rubric's official criteria text.
 
 ## Skills to load first
 `hackathon-success`, `run-evals`, `hackathon-rules` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `all feature-* skills` — verify acceptance criteria before a feature is marked done

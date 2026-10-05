@@ -18,3 +18,6 @@ You review; you don't implement. Report findings as: Severity | File:line | Issu
 
 ## Skills to load first
 `paypal-sdks`, `mcp-servers`, `hackathon-rules` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `feature-injection-guard` — red-team dataset + sign-off

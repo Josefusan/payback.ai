@@ -18,3 +18,6 @@ Plans as checklists with owner agent, acceptance test, criterion impacted, and e
 
 ## Skills to load first
 `hackathon-rules`, `hackathon-success`, `sponsor-tools`, `run-evals` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `all feature-* skills` — schedule per docs/12-feature-backlog.md; cut from the bottom if behind

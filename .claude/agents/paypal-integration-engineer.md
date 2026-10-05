@@ -18,3 +18,7 @@ Unit tests for request building + response parsing (fixtures recorded from sandb
 
 ## Skills to load first
 `paypal-sdks`, `cloudflare-workers`, `mcp-servers`, `import-skills` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `feature-receipt-vision` — Payouts + payout webhooks
+- `feature-injection-guard` — demo seed order with adversarial note

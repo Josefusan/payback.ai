@@ -19,3 +19,7 @@ A table: Requirement | Status | Evidence | Fix. Then a one-line verdict: SUBMITT
 
 ## Skills to load first
 `hackathon-rules`, `demo-submission`, `run-evals` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `feature-receipt-vision` — sample bills must be our own, no third-party marks
+- `feature-accounting-export` — no 'official integration' claims

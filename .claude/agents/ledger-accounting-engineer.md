@@ -17,3 +17,7 @@ You own `apps/worker/src/ledger.ts`, `apps/worker/migrations/`, and `/api/report
 
 ## Skills to load first
 `managerial-accounting`, `cloudflare-workers`, `paypal-sdks` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `feature-audit-trail` — lead
+- `feature-accounting-export` — lead

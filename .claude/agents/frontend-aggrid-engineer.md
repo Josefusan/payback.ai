@@ -19,3 +19,10 @@ Empty/loading/error states on every screen · one theme applied to grids and cha
 
 ## Skills to load first
 `sponsor-tools`, `hackathon-success`, `demo-submission` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `feature-confidence-dial` — ConfidenceDial widget
+- `feature-audit-trail` — Explain drawer
+- `feature-receipt-vision` — bill drop zone + bills grid
+- `feature-shadow-mode` — shadow report widget
+- `feature-accounting-export` — export button

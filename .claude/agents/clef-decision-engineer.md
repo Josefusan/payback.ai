@@ -20,3 +20,9 @@ Call `@cf/cloudflare/clef-flash` and `@cf/cloudflare/clef` from `wrangler dev` w
 
 ## Skills to load first
 `cloudflare-clef`, `cloudflare-workers`, `managerial-accounting`, `run-evals` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `feature-confidence-dial` — lead: labels + sweep API
+- `feature-receipt-vision` — lead: extraction + Clef
+- `feature-shadow-mode` — lead
+- `feature-ai-gateway-loop` — lead

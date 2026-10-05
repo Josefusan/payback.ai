@@ -18,3 +18,9 @@ An action executes autonomously only if (1) the Clef action decision is ≥ the 
 
 ## Skills to load first
 `paypal-sdks`, `cloudflare-clef`, `cloudflare-workers`, `managerial-accounting`, `mcp-servers` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `feature-injection-guard` — lead
+- `feature-audit-trail` — emit events
+- `feature-receipt-vision` — bill lifecycle + Payouts
+- `feature-ai-gateway-loop` — review hooks

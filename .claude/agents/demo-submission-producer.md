@@ -16,3 +16,8 @@ You own `README.md` (judge-facing sections), `submission/*`, and `docs/11-demo-v
 
 ## Skills to load first
 `demo-submission`, `hackathon-success`, `hackathon-rules` (in `.claude/skills/`). Project context: `CLAUDE.md`, `docs/07-project-brief.md`.
+
+## Feature skills (build specs) — see `docs/12-feature-backlog.md`
+- `feature-confidence-dial` — demo 1:10–1:40
+- `feature-injection-guard` — demo 2:10–2:25
+- `feature-audit-trail` — explain drawer shot
