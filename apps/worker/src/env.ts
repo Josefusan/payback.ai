@@ -1,3 +1,5 @@
+// IF-02 (owner: INT). Sole writer of this file and wrangler.jsonc. Lanes request a binding/var as an INT task;
+// INT applies env.ts + wrangler.jsonc + .dev.vars.example in one commit and logs it in docs/decisions.md.
 export interface Env {
   AI: Ai;
   DB: D1Database;
