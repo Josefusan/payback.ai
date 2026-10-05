@@ -74,7 +74,7 @@ Fable 5.1 review (2026-10-05) consolidated the 10 `.claude/agents` role prompts 
 
 ### L2 — Decisions & Evals
 - Owns paths: `src/clef.ts`, `src/coa.ts`, **`src/decision-provider.ts` (new)**, `src/routes/eval.ts`, `evals/dataset_*.jsonl`, `evals/product_evals.py`, `docs/clef-response-sample.json`, `test/fixtures/clef/`, `.claude/skills/cloudflare-clef/`.
-- Owns endpoints: `POST /api/eval/*`, `GET|PUT /api/settings/threshold`.
+- Owns endpoints: `POST /api/eval/*`, `GET /api/confidence/sweep`, `GET|PUT /api/settings/auto_post_threshold`.
 - Owns tables/migrations: `decisions`; `0003_confidence_dial.sql`, `0005_shadow.sql`.
 - Frozen exports: `TxnForDecision`, `TxnDecision`, `decideTransaction`, `decideAction`, `SCHEMA_VERSION`, `CLEF_ACCOUNT_CRITERIA`, `PRODUCT_LINES`.
 - Forbidden paths: `src/pipeline.ts`, `apps/web/**`.
@@ -115,7 +115,7 @@ Fable 5.1 review (2026-10-05) consolidated the 10 `.claude/agents` role prompts 
 
 | id | name | owner | consumers | source path | status |
 |---|---|---|---|---|---|
-| IF-01 | HTTP API contract + fixtures | INT | L4, L5, all | `packages/contracts/api.ts` + `test/fixtures/http/*.json` | draft@G0, frozen@G2 |
+| IF-01 | HTTP API contract + fixtures | INT | L4, L5, all | `packages/contracts/api.ts` + `packages/contracts/fixtures/*.json` (index: `fixtures.ts`) | draft@G0, frozen@G2 |
 | IF-02 | `Env` bindings shape | INT | all backend lanes | `src/env.ts` | draft@G0, frozen@G1 |
 | IF-03 | `PayPalClient` methods + `PayPalTransactionDetail` | L1 | L3 | `src/paypal.ts` | draft@G0, frozen@G2 |
 | IF-04 | `ActionProposal`, `PolicyResult`, `evaluateAction`, `idempotencyKey` | L1 | L2, GATE | `src/policy.ts` | draft@G0, frozen@G3 |
@@ -335,7 +335,7 @@ Id scheme `T-<lane>-<nnn>`. Fields: gate · depends_on · criteria · dod · evi
 ### T-INT-002 · `packages/contracts/api.ts` v0 + fixtures
 - gate G0 · depends_on: T-INT-001 · criteria: C1
 - dod: response types for every endpoint in §1; one fixture JSON each, owned by the producing lane.
-- evidence: `packages/contracts/api.ts`, `test/fixtures/http/*.json`.
+- evidence: `packages/contracts/api.ts`, `packages/contracts/fixtures/*.json`, `apps/worker/src/contracts.test.ts`.
 
 ### T-INT-003 · Env/binding change process
 - gate G0 · depends_on: — · criteria: C1

@@ -1,0 +1,1 @@
+{"account":{"choice":"4000","probabilities":{"4000":0.94,"4100":0.04,"3000":0.02}},"product_line":{"choice":"templates","probabilities":{"templates":0.91,"courses":0.09}},"needs_review":{"noul":0.06},"risk":{"score":0.2},"gate":"auto","reasons":[],"model":"@cf/cloudflare/clef-flash"}

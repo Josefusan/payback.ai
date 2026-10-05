@@ -1,0 +1,1 @@
+[{"threshold":0.8,"coverage":0.86,"auto_precision":0.95,"review_rate":0.14,"n_labeled":150},{"threshold":0.9,"coverage":0.74,"auto_precision":0.98,"review_rate":0.26,"n_labeled":150},{"threshold":0.95,"coverage":0.61,"auto_precision":0.99,"review_rate":0.39,"n_labeled":150}]
