@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "paypal-sandbox": {
+      "command": "npx",
+      "args": ["-y", "@paypal/mcp", "--tools=all"],
+      "env": {
+        "PAYPAL_ACCESS_TOKEN": "${PAYPAL_ACCESS_TOKEN}",
+        "PAYPAL_ENVIRONMENT": "SANDBOX"
+      }
+    },
+    "context-matic": {
+      "type": "http",
+      "url": "https://chatbotapi.apimatic.io/mcp/plugins"
+    },
+    "ag-mcp": {
+      "command": "npx",
+      "args": ["ag-mcp"]
+    },
+    "cloudflare-docs": {
+      "type": "http",
+      "url": "https://docs.mcp.cloudflare.com/mcp"
+    }
+  }
+}
