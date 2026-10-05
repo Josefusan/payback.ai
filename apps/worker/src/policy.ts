@@ -2,6 +2,8 @@
  * Action policy — the second key for money movement. Pure function; unit-tested; mirrored by evals/dataset_safety.jsonl.
  * Outcome: "auto" (execute), "review" (human approval), "blocked" (never execute).
  */
+import type { Env } from "./env";
+
 export type ActionType = "payout" | "refund" | "invoice_reminder" | "invoice_create" | "dispute_accept";
 
 export interface ActionProposal {
@@ -26,6 +28,16 @@ export interface PolicyConfig {
 export interface PolicyResult { outcome: "auto" | "review" | "blocked"; rule: string }
 
 export const DEFAULT_PAYEES = ["sam.ortiz@example.com", "kai.moreno@example.com"]; // demo vendors; real list lives in DB
+
+export function policyConfig(env: Env): PolicyConfig {
+  return {
+    actionThreshold: Number(env.ACTION_THRESHOLD || "0.95"),
+    payoutAutonomousLimitCents: Number(env.AUTONOMOUS_PAYOUT_LIMIT_CENTS || "100000"),
+    refundAutonomousLimitCents: 10_000,
+    refundHardCapCents: 100_000,
+    payeeAllowList: DEFAULT_PAYEES,
+  };
+}
 
 export function idempotencyKey(p: ActionProposal): string {
   return [p.type, p.bill_id ?? p.capture_id ?? p.invoice_id ?? p.dispute_id ?? p.customer ?? "", p.amount_cents ?? ""].join(":");

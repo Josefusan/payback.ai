@@ -132,7 +132,7 @@ Fable 5.1 review (2026-10-05) consolidated the 10 `.claude/agents` role prompts 
 Each exit check is a command with expected output. A gate is green only when all its checks pass.
 
 ### G0 — Contract freeze · 2026-10-06
-- Exit: `npx wrangler dev` boots; `npx wrangler d1 migrations apply payback --local` exits 0.
+- Exit: `npx wrangler dev --local` boots and `GET /api/health` → 200 (plain `wrangler dev` needs `CLOUDFLARE_API_TOKEN` for the remote AI binding); `npx wrangler d1 migrations apply payback --local` exits 0.
 - Exit: `src/index.ts` split into empty per-lane route modules mounted with Hono `app.route`.
 - Exit: `packages/contracts/api.ts` v0 + one fixture JSON per endpoint exists.
 - Exit: `docs/13-build-plan.md` (this file) written; `evals/dod.py` stub exists.

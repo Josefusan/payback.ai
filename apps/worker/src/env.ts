@@ -19,3 +19,6 @@ export interface Env {
 export type SyncMessage =
   | { kind: "transaction"; transactionId: string }
   | { kind: "webhook"; eventId: string };
+
+/** Hono generic shared by every route module (`new Hono<AppEnv>()`). */
+export type AppEnv = { Bindings: Env };

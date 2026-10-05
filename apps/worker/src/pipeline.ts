@@ -1,7 +1,7 @@
 /**
  * The autonomous loop: PayPal → Clef decision → gate → post journal or review queue.
  */
-import type { Env } from "./env";
+import type { Env, SyncMessage } from "./env";
 import { PayPalClient, type PayPalTransactionDetail } from "./paypal";
 import { decideTransaction, type TxnForDecision } from "./clef";
 import { buildJournal, UnsupportedEventError } from "./ledger";
@@ -118,4 +118,24 @@ export async function reconcile(env: Env) {
     const ledgerCents = byCur.get(b.currency) ?? 0;
     return { currency: b.currency, paypalCents, ledgerCents, diffCents: paypalCents - ledgerCents, ok: Math.abs(paypalCents - ledgerCents) <= 1 };
   });
+}
+
+/** Cron: last 48h (Transaction Search can lag ~3h); INSERT OR IGNORE keeps it idempotent. */
+export async function runScheduledSync(env: Env): Promise<void> {
+  const end = new Date();
+  const start = new Date(end.getTime() - 48 * 3600_000);
+  await syncWindow(env, start.toISOString(), end.toISOString());
+}
+
+export async function handleSyncBatch(batch: MessageBatch<SyncMessage>, env: Env): Promise<void> {
+  for (const msg of batch.messages) {
+    try {
+      if (msg.body.kind === "transaction") await processTransaction(env, msg.body.transactionId);
+      // TODO: webhook events → map resource to transaction / invoice / payout updates
+      msg.ack();
+    } catch (e) {
+      console.error("queue message failed", msg.body, (e as Error).message);
+      msg.retry();
+    }
+  }
 }
