@@ -7,13 +7,14 @@
 2. `.claude/skills/hackathon-rules/SKILL.md` — non-negotiable constraints
 3. `.claude/skills/hackathon-success/SKILL.md` — what winning means, thresholds
 4. `docs/10-timeline.md` + `docs/status.md` — where we are
+5. `docs/12-feature-backlog.md` — add-on features, owners, reserved migration numbers
 
 ## Map
 | Path | What |
 |---|---|
 | `docs/` | Rules (full text), judging, prizes, checklist, resources, brief, architecture, timeline, video plan, sponsor research |
 | `.claude/agents/` | Subagents: hackathon-strategist, rules-compliance-officer, paypal-integration-engineer, clef-decision-engineer, ledger-accounting-engineer, agentic-workflow-engineer, frontend-aggrid-engineer, eval-judge, demo-submission-producer, security-reviewer |
-| `.claude/skills/` | hackathon-rules, hackathon-success, paypal-sdks, cloudflare-clef, cloudflare-workers, managerial-accounting, sponsor-tools, import-skills, mcp-servers, run-evals, demo-submission |
+| `.claude/skills/` | Core: hackathon-rules, hackathon-success, paypal-sdks, cloudflare-clef, cloudflare-workers, managerial-accounting, sponsor-tools, import-skills, mcp-servers, run-evals, demo-submission · Feature build specs: feature-audit-trail, feature-injection-guard, feature-confidence-dial, feature-receipt-vision, feature-shadow-mode, feature-accounting-export, feature-ai-gateway-loop (owners + order: `docs/12-feature-backlog.md`) |
 | `.mcp.json` | Project MCP servers (PayPal sandbox, APIMatic context, AG Grid docs, Cloudflare docs) |
 | `apps/worker/` | Cloudflare Worker (Hono, D1, Queues, Workers AI/Clef) |
 | `apps/web/` | React + AG Studio dashboard (to build) |
