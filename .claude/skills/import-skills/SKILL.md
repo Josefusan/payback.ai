@@ -27,6 +27,7 @@ description: How to import external Claude Code skills and plugins that help win
 
 ## Our own skills (already in repo, auto-discovered from `.claude/skills/`)
 hackathon-rules · hackathon-success · paypal-sdks · cloudflare-clef · cloudflare-workers · managerial-accounting · sponsor-tools · import-skills · mcp-servers · run-evals · demo-submission
+Feature build specs: feature-audit-trail · feature-injection-guard · feature-confidence-dial · feature-receipt-vision · feature-shadow-mode · feature-accounting-export · feature-ai-gateway-loop
 
 ## Other agent runtimes
 - **Codex / Cursor / generic agents:** read `AGENTS.md` (root) — it points to the same skills; skills are plain Markdown and can be pasted as context.
