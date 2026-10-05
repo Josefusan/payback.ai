@@ -1,0 +1,132 @@
+{
+  "version": "1.0.0",
+  "source": "PayPal AI Hackathon Official Rules §4, §6 (docs/01-official-rules.md)",
+  "thresholds": {
+    "stage2_mean_min": 8.5,
+    "stage2_criterion_min": 7.5,
+    "presentation_min": 8.5
+  },
+  "stage1_gates": [
+    {
+      "id": "fits_theme",
+      "question": "Does the project reasonably fit the theme: an application that meaningfully uses BOTH PayPal (developer platform, sandbox) AND an AI tool/model/platform, with PayPal integration central (not a bolt-on pay button)?"
+    },
+    {
+      "id": "applies_required_apis",
+      "question": "Does the project reasonably apply the required PayPal APIs/SDKs (REST APIs, JS SDK, Agent Toolkit, MCP, or other PayPal services) in working code, using the sandbox environment?"
+    },
+    {
+      "id": "functional_demo",
+      "question": "Can a judge actually run or interact with a working build via complete setup/run instructions OR a hosted demo URL (not a mockup, static prototype or non-functional demo)?"
+    },
+    {
+      "id": "repo_and_license",
+      "question": "Is there a GitHub repository containing all source, assets and instructions, with an open-source license file?"
+    },
+    {
+      "id": "video_requirements",
+      "question": "Is there a demo video plan/transcript under 3 minutes that shows the project functioning on its platform, intended for public YouTube, without third-party trademarks or copyrighted music?"
+    },
+    {
+      "id": "claims_match_build",
+      "question": "Do the text description and video only claim features that the code/demo actually implements (Rules: must function as depicted)?"
+    }
+  ],
+  "criteria": [
+    {
+      "id": "technological_implementation",
+      "name": "Technological Implementation",
+      "official": "How thoroughly and skillfully does the project use PayPal Developer Platform and AI tool(s)? Does the project reflect genuine effort and a working, non-trivial implementation?",
+      "anchors": {
+        "10": ">=4 distinct PayPal capabilities used correctly in sandbox with OAuth caching, webhook signature verification, idempotency, pagination and error handling; AI is load-bearing with calibrated confidence and human-in-the-loop; tests and evals present; runs from README quickly.",
+        "7": "2-3 PayPal capabilities wired end-to-end; AI meaningful; some rough edges.",
+        "4": "A single PayPal button or API call; AI is a bolted-on chat box.",
+        "1": "Mock data only; PayPal not actually called."
+      }
+    },
+    {
+      "id": "design",
+      "name": "Design",
+      "official": "Does the project deliver a complete, coherent product experience — not just a technical proof of concept?",
+      "anchors": {
+        "10": "Feels like a product: onboarding, main loop, review, reports; empty/loading/error states; consistent visual system; every screen has a purpose.",
+        "7": "Coherent main flow; some unpolished screens.",
+        "4": "Developer console or raw JSON output.",
+        "1": "A script or proof of concept."
+      }
+    },
+    {
+      "id": "potential_impact",
+      "name": "Potential Impact",
+      "official": "Does the project make a credible, specific case for solving a real problem for a real audience — and does the solution actually address that problem based on what's demonstrated?",
+      "anchors": {
+        "10": "Specific audience, quantified pain with sources or measurements, and the demo shows the pain removed with concrete numbers.",
+        "7": "Real audience, generic claims.",
+        "4": "Vague audience ('everyone').",
+        "1": "No problem stated."
+      }
+    },
+    {
+      "id": "innovation",
+      "name": "Innovation/Idea",
+      "official": "How creative and novel is the concept and does the project differ from existing concepts?",
+      "anchors": {
+        "10": "Clearly new approach judges haven't seen; differentiated from existing products (e.g., QuickBooks/Xero/PayPal reports) in a way that matters.",
+        "7": "Known idea with a meaningful novel twist.",
+        "4": "Common 'ChatGPT for X' concept.",
+        "1": "Clone of an existing product."
+      }
+    },
+    {
+      "id": "presentation",
+      "name": "Presentation",
+      "official": "Does the video clearly demonstrate the project working end-to-end? Does the pitch communicate what problem is solved, who it's for, and why it matters? Is the overall presentation easy to follow?",
+      "anchors": {
+        "10": "Under 2:50; first 15s state who/pain/solution; live end-to-end run in PayPal sandbox; clear narration and captions; ends with impact numbers and architecture.",
+        "7": "Clear but slow start or partial flow.",
+        "4": "Mostly slides, little product footage.",
+        "1": "Over 3 minutes, not public, or not on YouTube."
+      }
+    }
+  ],
+  "tie_break_order": ["technological_implementation", "design", "potential_impact", "innovation", "presentation"],
+  "prizes": {
+    "grand": ["1st Place", "2nd Place", "3rd Place"],
+    "honorable_mentions": ["Most Creative", "Most Impactful", "Best Demo Delivery", "Best Use of PayPal + AI", "Best Use of Agentic Commerce"],
+    "sponsor": {
+      "AG Grid": "Polish: custom widgets, theming, layout tools, not just AG Grid or AG Charts on their own; Studio Agent Framework (custom agent talking to Studio's built-in agents, or swapped-in harness).",
+      "APIMatic": "Uses APIMatic tools (e.g., Context Plugins) to build the PayPal integration.",
+      "Bryntum": "Best use of Gantt, Scheduler and/or Calendar (timeline, resource booking, or an agent that drives the schedule).",
+      "Channel3": "Calls the Channel3 API/MCP meaningfully (search, enrichment, recommendations).",
+      "Render": "Uses Render tools."
+    },
+    "stacking_rule": "Max one Grand + one Sponsor, OR one Honorable Mention + one Sponsor."
+  },
+  "personas": [
+    {
+      "id": "paypal_devrel",
+      "title": "PayPal Developer Advocate",
+      "lens": "Idiomatic, correct PayPal integration; developer experience; README clarity; would I show this to the community?"
+    },
+    {
+      "id": "paypal_engineering",
+      "title": "PayPal Software Engineer / Engineering Manager",
+      "lens": "Correct API usage, webhooks verification, idempotency, error handling, security, architecture, reliability."
+    },
+    {
+      "id": "paypal_product",
+      "title": "PayPal Senior Product Manager",
+      "lens": "Real user, real problem, coherent product, business case, differentiation, would merchants adopt it?"
+    },
+    {
+      "id": "sponsor_aggrid",
+      "title": "AG Grid community lead",
+      "lens": "Polished dashboard, custom widgets, theming, layout, Studio Agent Framework usage, overall UX."
+    },
+    {
+      "id": "skeptical_ai_judge",
+      "title": "Skeptical automated AI reviewer",
+      "lens": "Penalize unverifiable claims, hype, mockups, AI that is not load-bearing, and anything the evidence doesn't demonstrate."
+    }
+  ]
+}
