@@ -17,6 +17,8 @@ For humans and AI agents. Start with 07 (what) → 01/02 (rules & success) → 1
 | [11-demo-video-plan.md](11-demo-video-plan.md) | Shot list and narration draft |
 | [12-feature-backlog.md](12-feature-backlog.md) | Add-on features → skills, owners, order, reserved migrations |
 | [13-build-plan.md](13-build-plan.md) | **Build plan & sub-agent kickoff prompt** — lanes, interfaces, gates, task registry, PM protocol |
+| [14-production-audit.md](14-production-audit.md) | **Production architecture audit process** — boundary ladder + six-pillar scorecard, cadence G1/G4/G5 |
+| [15-roadmap.md](15-roadmap.md) | **Finish roadmap** — requirements → evidence traceability, critical path, phased plan, blockers, cut lines |
 | [status.md](status.md) · [decisions.md](decisions.md) · [rulings.md](rulings.md) | Living logs |
 | [sandbox-activity.md](sandbox-activity.md) · [tooling.md](tooling.md) | Sandbox data ledger; installed plugins/MCP |
 

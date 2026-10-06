@@ -4,8 +4,8 @@
 import type { Env, SyncMessage } from "./env";
 import { PayPalClient, type PayPalTransactionDetail } from "./paypal";
 import { decideTransaction, type TxnForDecision } from "./clef";
-import { buildJournal, UnsupportedEventError } from "./ledger";
-import { toCents } from "./money";
+import { buildJournal, buildOpeningLines, UnsupportedEventError } from "./ledger";
+import { fromCents, toCents } from "./money";
 
 export function toDecisionInput(d: PayPalTransactionDetail): TxnForDecision {
   const t = d.transaction_info;
@@ -25,6 +25,8 @@ export function toDecisionInput(d: PayPalTransactionDetail): TxnForDecision {
 
 /** Pull a window from Transaction Search, store new rows idempotently, enqueue for decisions. */
 export async function syncWindow(env: Env, startISO: string, endISO: string): Promise<{ seen: number; enqueued: number }> {
+  // T-L3-001a: bring the real PayPal balance onto the books once, before the first window is ingested.
+  await ensureOpeningBalance(env, startISO);
   const pp = new PayPalClient(env);
   let seen = 0;
   let enqueued = 0;
@@ -105,19 +107,97 @@ export async function processTransaction(env: Env, transactionId: string): Promi
   return "posted";
 }
 
-/** Reconcile PayPal Clearing (1010) to the Balances API per currency. */
-export async function reconcile(env: Env) {
+/** Outcome of the one-time opening-balance step. */
+export interface OpeningBalanceResult {
+  posted: boolean; // true only for the sync that actually wrote the entry
+  cutoff: string | null; // sync_state.sync_cutoff (ISO); null while nothing has been posted yet
+  currency: string | null; // primary currency the opening entry was built for
+  unsupportedCurrencies: string[]; // non-primary currencies: no opening entry, surfaced by reconcile
+}
+
+/**
+ * T-L3-001a — post the opening PayPal balance exactly once and record the sync cutoff.
+ *
+ * On the first sync we snapshot the **primary-currency** balance pinned at the start of the window
+ * (`as_of_time`), append ONE balanced entry `source='opening'` (Dr 1010 / Cr 3000) and store the cutoff in
+ * `sync_state` so no later sync repeats it. The cutoff is the window start, so every transaction posts on
+ * top of the opening (never double-counted). Idempotent: the `INSERT OR IGNORE` on `sync_state` is claimed
+ * atomically, so even concurrent first syncs post at most one entry.
+ *
+ * INVARIANT (the project's #1 on-camera risk): the cutoff is NEVER left claimed without the opening entry
+ * actually posted — a claimed cutoff short-circuits every later sync, 1010 stays 0 and reconcile can never
+ * claim ok. Three orderings enforce it:
+ *   1. the Balances snapshot is validated BEFORE anything is claimed, so an empty/failed first response
+ *      leaves no cutoff behind and the next sync opens the books normally;
+ *   2. the entry + lines + `sync_currency` are written in the same batch right after the claim, and any
+ *      failure deletes the claim again (compensation), so a retry can still post the opening entry;
+ *   3. a cutoff found WITHOUT an opening entry (a crash between the claim and the batch) is treated as a
+ *      stale claim: it is released and re-posted, pinned at the claimed cutoff so the snapshot still lines
+ *      up with the transactions posted on top of it.
+ */
+export async function ensureOpeningBalance(env: Env, cutoffISO: string): Promise<OpeningBalanceResult> {
+  // One round trip covers both halves of the invariant: the claimed cutoff and whether the entry exists.
+  const state = await env.DB.prepare(
+    `SELECT (SELECT value FROM sync_state WHERE key = 'sync_cutoff') AS cutoff,
+            EXISTS(SELECT 1 FROM journal_entries WHERE source = 'opening') AS posted`,
+  ).first<{ cutoff: string | null; posted: number }>();
+
+  if (state?.cutoff && state.posted) {
+    const cur = await env.DB.prepare(`SELECT value FROM sync_state WHERE key = 'sync_currency'`).first<{ value: string }>();
+    return { posted: false, cutoff: state.cutoff, currency: cur?.value ?? null, unsupportedCurrencies: [] };
+  }
+
+  // Stale claim (cutoff without entry) → release it and fall through, re-pinned at the claimed cutoff.
+  const pinISO = state?.cutoff ?? cutoffISO;
+  if (state?.cutoff) {
+    await env.DB.batch([
+      env.DB.prepare(`DELETE FROM sync_state WHERE key = 'sync_cutoff'`),
+      env.DB.prepare(`DELETE FROM sync_state WHERE key = 'sync_currency'`),
+    ]);
+  }
+
+  // Validate the snapshot FIRST: nothing is claimed for a snapshot we cannot post from.
   const pp = new PayPalClient(env);
-  const { balances } = await pp.getBalances();
-  const ledger = await env.DB.prepare(
-    `SELECT currency, SUM(debit_cents) - SUM(credit_cents) AS bal FROM journal_lines WHERE account_code = '1010' GROUP BY currency`,
-  ).all<{ currency: string; bal: number }>();
-  const byCur = new Map(ledger.results.map((r) => [r.currency, r.bal]));
-  return balances.map((b) => {
-    const paypalCents = toCents(b.total_balance.value);
-    const ledgerCents = byCur.get(b.currency) ?? 0;
-    return { currency: b.currency, paypalCents, ledgerCents, diffCents: paypalCents - ledgerCents, ok: Math.abs(paypalCents - ledgerCents) <= 1 };
-  });
+  const snapshot = await pp.getBalances(undefined, pinISO);
+  const balances = snapshot.balances ?? [];
+  const primary = balances.find((b) => b.primary) ?? balances[0];
+  const unsupportedCurrencies = balances.filter((b) => b !== primary).map((b) => b.currency);
+  const balanceCents = primary ? toCents(primary.total_balance.value) : 0;
+  const lines = primary ? buildOpeningLines(primary.currency, balanceCents) : [];
+  if (!primary || !lines.length) {
+    // Nothing to open (no Balances row, or a zero balance): claim nothing, retry on a later sync.
+    return { posted: false, cutoff: null, currency: primary?.currency ?? null, unsupportedCurrencies };
+  }
+
+  // Claim the cutoff atomically: only the winner of the INSERT (meta.changes > 0) posts the entry.
+  const claim = await env.DB.prepare(`INSERT OR IGNORE INTO sync_state (key, value) VALUES ('sync_cutoff', ?1)`).bind(pinISO).run();
+  if (claim.meta.changes === 0) {
+    const winner = await env.DB.prepare(`SELECT value FROM sync_state WHERE key = 'sync_cutoff'`).first<{ value: string }>();
+    return { posted: false, cutoff: winner?.value ?? pinISO, currency: primary.currency, unsupportedCurrencies };
+  }
+
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO journal_entries (source, source_id, entry_date, memo, approver)
+         VALUES ('opening', ?1, ?2, ?3, 'system')`,
+      ).bind(pinISO, pinISO.slice(0, 10), `Opening balance ${fromCents(balanceCents)} ${primary.currency} as of ${pinISO}`),
+      ...lines.map((l) =>
+        env.DB.prepare(
+          `INSERT INTO journal_lines (entry_id, account_code, debit_cents, credit_cents, currency)
+           VALUES ((SELECT id FROM journal_entries WHERE source = 'opening' AND source_id = ?1), ?2, ?3, ?4, ?5)`,
+        ).bind(pinISO, l.account, l.debit, l.credit, l.currency),
+      ),
+      // Same transaction as the entry: the cutoff and the currency it was opened for appear together.
+      env.DB.prepare(`INSERT OR IGNORE INTO sync_state (key, value) VALUES ('sync_currency', ?1)`).bind(primary.currency),
+    ]);
+  } catch (error) {
+    // Compensate: release the claim so the next sync can post the opening entry instead of short-circuiting.
+    await env.DB.prepare(`DELETE FROM sync_state WHERE key = 'sync_cutoff'`).run();
+    throw error;
+  }
+
+  return { posted: true, cutoff: pinISO, currency: primary.currency, unsupportedCurrencies };
 }
 
 /** Cron: last 48h (Transaction Search can lag ~3h); INSERT OR IGNORE keeps it idempotent. */

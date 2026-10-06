@@ -96,7 +96,17 @@ export interface LedgerEntryResponse {
   lines: Omit<LedgerLine, "entry_id" | "entry_date" | "memo" | "source_id">[];
 }
 
-export interface ReconcileRow { currency: string; paypalCents: Cents; ledgerCents: Cents; diffCents: Cents; ok: boolean }
+export interface ReconcileRow {
+  currency: string;
+  paypalCents: Cents; // Balances API total_balance
+  ledgerCents: Cents; // journal_lines 1010 net (debit − credit)
+  diffCents: Cents; // paypalCents − ledgerCents
+  pendingCents: Cents; // Σ(amount + fee) of paypal_transactions not yet posted (new|decided|review)
+  asOfTime: ISODateTime; // as_of_time of this Balances snapshot
+  cutoff: ISODateTime | null; // sync_state.sync_cutoff (when the opening balance was posted)
+  ok: boolean; // exact tie-out AND pendingCents === 0
+  reason: string | null; // short reason when ok is false
+}
 export type ReconcileResponse = ReconcileRow[];
 
 export interface PnlRow {

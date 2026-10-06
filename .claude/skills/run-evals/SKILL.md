@@ -12,6 +12,7 @@ Details: `evals/README.md`. Rubric: `evals/rubric.json`.
 python evals/checks.py                                   # 1. rules gates (fast, no network)
 python evals/product_evals.py --worker http://localhost:8787 --safety   # 3. needs `wrangler dev` running
 python evals/llm_judge.py --strict                       # 2. needs ANTHROPIC_API_KEY + JUDGE_MODEL
+python evals/architecture_audit.py                      # 4. production architecture audit → evals/out/audit.json (docs/14)
 python evals/checks.py --github Josefusan/payback.ai   # final: repo public + license detected
 ```
 

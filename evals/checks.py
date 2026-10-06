@@ -29,6 +29,9 @@ DEADLINE_UTC = dt.datetime(2026, 11, 12, 20, 0, tzinfo=dt.timezone.utc)  # Nov 1
 PERIOD_START_UTC = dt.datetime(2026, 10, 1, 16, 0, tzinfo=dt.timezone.utc)  # Oct 1 2026 09:00 PDT
 
 CODE_DIRS = ["apps", "scripts"]
+# T-INT-007 / docs/14-production-audit.md §AUD-7: routes are transport; SQL lives in the domain modules.
+ROUTE_SQL_GLOB = "apps/worker/src/routes/*.ts"
+ROUTE_SQL_PATTERN = r"\.prepare\(|env\.DB\.batch\("
 CODE_EXT = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".py", ".json", ".jsonc", ".toml", ".sql"}
 SKIP_DIRS = {"node_modules", ".git", "dist", ".wrangler", "out", "__pycache__", ".next"}
 
@@ -190,7 +193,9 @@ def check_secrets(r: Results, files: list[Path]) -> None:
         for name, pat in SECRET_PATTERNS.items():
             for m in re.finditer(pat, text):
                 snippet = m.group(0)
-                if re.search(r"(?i)(your_|example|placeholder|xxxx|changeme|<)", snippet):
+                # Synthetic values are not secrets: test fixtures/placeholders are exempt (a real
+                # token never contains these markers).
+                if re.search(r"(?i)(your_|example|placeholder|xxxx|changeme|fixture|<)", snippet):
                     continue
                 hits.append(f"{rel} [{name}]")
     tracked = [p for p in FORBIDDEN_TRACKED if (ROOT / p) in set(files)]
@@ -250,6 +255,20 @@ def check_tests(r: Results, files: list[Path]) -> None:
     r.add("tests", "Automated tests present", "PASS" if tests else "WARN", False, f"{len(tests)} test files", "Judging: Tech Implementation")
 
 
+def check_route_no_sql(r: Results) -> None:
+    """AUD-7: no file under apps/worker/src/routes/ may contain SQL (`.prepare(`, `env.DB.batch(`)."""
+    hits = []
+    for f in sorted(ROOT.glob(ROUTE_SQL_GLOB)):
+        rel = f.relative_to(ROOT)
+        for i, line in enumerate(read(f).splitlines(), 1):
+            if re.search(ROUTE_SQL_PATTERN, line):
+                hits.append(f"{rel}:{i}")
+    detail = (f"{len(hits)} SQL statement(s) in route modules: " + ", ".join(hits[:10]) if hits
+              else "no .prepare( / env.DB.batch( under apps/worker/src/routes/")
+    r.add("route_no_sql", "No SQL in route modules (routes are transport)", "FAIL" if hits else "PASS", True,
+          detail, "docs/14-production-audit.md §AUD-7; Judging: Tech Implementation")
+
+
 def check_new_project(r: Results) -> None:
     try:
         out = subprocess.run(["git", "log", "--reverse", "--format=%cI", "--max-parents=0"], cwd=ROOT,
@@ -299,6 +318,7 @@ def main() -> int:
     check_video(r)
     check_submission_text(r)
     check_tests(r, files)
+    check_route_no_sql(r)
     check_new_project(r)
     if args.github:
         check_github(r, args.github)

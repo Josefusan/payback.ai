@@ -6,6 +6,30 @@ import type { Env } from "./env";
 
 const SANDBOX_BASE = "https://api-m.sandbox.paypal.com";
 
+/** Transaction Search (`/v1/reporting/transactions`) rejects windows longer than 31 days. */
+export const MAX_SEARCH_RANGE_MS = 31 * 24 * 60 * 60 * 1000;
+
+/** PayPal returns JSON on success; error pages can be HTML/text — never let JSON.parse mask a PayPalError. */
+function parseJson(text: string): unknown {
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return { raw: text };
+  }
+}
+
+/** Fail fast on >31-day / inverted Transaction Search windows instead of a 400 from PayPal. */
+function assertSearchRange(startISO: string, endISO: string): void {
+  const start = Date.parse(startISO);
+  const end = Date.parse(endISO);
+  if (Number.isNaN(start) || Number.isNaN(end)) throw new RangeError(`invalid date range: ${startISO} .. ${endISO}`);
+  if (end < start) throw new RangeError(`end_date ${endISO} is before start_date ${startISO}`);
+  if (end - start > MAX_SEARCH_RANGE_MS) {
+    throw new RangeError(`Transaction Search range must be <= 31 days (got ${((end - start) / 86_400_000).toFixed(1)})`);
+  }
+}
+
 export interface Money { currency_code: string; value: string }
 
 export interface PayPalTransactionInfo {
@@ -36,20 +60,30 @@ export class PayPalError extends Error {
   }
 }
 
+type FetchLike = typeof fetch;
+
+// Module-scoped so a warm isolate reuses the ~9h token across requests; `resetTokenCache()` keeps tests isolated.
 let cachedToken: { token: string; expiresAt: number } | null = null;
+
+/** Test hook: drop the cached access token so the next call does a fresh OAuth round-trip. */
+export function resetTokenCache(): void {
+  cachedToken = null;
+}
 
 export class PayPalClient {
   private readonly base = SANDBOX_BASE;
+  private readonly fetchImpl: FetchLike;
 
-  constructor(private readonly env: Env) {
+  constructor(private readonly env: Env, opts: { fetch?: FetchLike } = {}) {
     if (env.PAYPAL_ENV !== "sandbox") {
       throw new Error("PAYPAL_ENV must be 'sandbox' — live PayPal is forbidden in this project (hackathon rules + safety).");
     }
+    this.fetchImpl = opts.fetch ?? fetch;
   }
 
   private async token(): Promise<string> {
     if (cachedToken && Date.now() < cachedToken.expiresAt - 5 * 60_000) return cachedToken.token;
-    const res = await fetch(`${this.base}/v1/oauth2/token`, {
+    const res = await this.fetchImpl(`${this.base}/v1/oauth2/token`, {
       method: "POST",
       headers: {
         Authorization: `Basic ${btoa(`${this.env.PAYPAL_CLIENT_ID}:${this.env.PAYPAL_CLIENT_SECRET}`)}`,
@@ -72,9 +106,8 @@ export class PayPalClient {
       Prefer: "return=representation",
     };
     if (opts.requestId) headers["PayPal-Request-Id"] = opts.requestId;
-    const res = await fetch(url, { method, headers, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) });
-    const text = await res.text();
-    const json = text ? JSON.parse(text) : {};
+    const res = await this.fetchImpl(url, { method, headers, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) });
+    const json = parseJson(await res.text());
     if (!res.ok) throw new PayPalError(res.status, (json as { debug_id?: string }).debug_id, json);
     return json as T;
   }
@@ -82,6 +115,7 @@ export class PayPalClient {
   // ── Reporting ────────────────────────────────────────────────────────────
   /** Transaction Search. Range must be ≤ 31 days. Iterates all pages. */
   async *listTransactions(startISO: string, endISO: string): AsyncGenerator<PayPalTransactionDetail> {
+    assertSearchRange(startISO, endISO);
     let page = 1;
     for (;;) {
       const data = await this.request<{ transaction_details: PayPalTransactionDetail[]; total_pages: number }>(
@@ -94,9 +128,13 @@ export class PayPalClient {
     }
   }
 
-  getBalances(currency?: string) {
+  /** Balances for reconciliation. `asOfTime` pins the snapshot so the tie-out compares like-for-like. */
+  getBalances(currency?: string, asOfTime?: string) {
+    const query: Record<string, string> = {};
+    if (currency) query.currency_code = currency;
+    if (asOfTime) query.as_of_time = asOfTime;
     return this.request<{ balances: Array<{ currency: string; primary?: boolean; total_balance: Money; available_balance?: Money; withheld_balance?: Money }>; as_of_time?: string }>(
-      "GET", "/v1/reporting/balances", { query: currency ? { currency_code: currency } : {} },
+      "GET", "/v1/reporting/balances", { query },
     );
   }
 

@@ -60,6 +60,12 @@ TASKS: dict[str, list[tuple]] = {
         ("cmd", ["grep", "-q", "fallback-llm", f"{W}/src/decision-provider.ts"], ".", 0),
         ("cmd", ["npx", "vitest", "run", "src/decision-provider.test.ts"], W, 0),
     ],
+    "T-L4-001": [
+        ("cmd", ["npm", "run", "build"], "apps/web", 0),
+        ("cmd", ["npx", "vitest", "run"], "apps/web", 0),
+        ("exists", "apps/web/src/components/LedgerGrid.tsx"),
+        ("exists", "apps/web/src/data/ledger.ts"),
+    ],
 }
 
 GATES: dict[str, list[tuple]] = {

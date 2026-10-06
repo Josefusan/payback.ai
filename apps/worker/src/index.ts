@@ -24,6 +24,25 @@ app.route("/", reports); // L3
 app.route("/", audit); // L3
 app.route("/", evalRoutes); // L2
 
+// T-INT-006 (AUD-7, P1.3 central_error_handler): one audited JSON 500 per unhandled handler throw.
+// A thrown handler error never escapes as a bare runtime error: it is logged as one structured line
+// and answered with a JSON body carrying the same correlation id.
+app.onError((err, c) => {
+  const id = crypto.randomUUID();
+  console.error(
+    JSON.stringify({
+      level: "error",
+      event: "unhandled_error",
+      id,
+      method: c.req.method,
+      path: c.req.path,
+      message: err.message,
+      stack: err.stack ?? null,
+    }),
+  );
+  return c.json({ error: "internal", id }, 500, { "X-Correlation-Id": id });
+});
+
 export default {
   fetch: app.fetch,
   scheduled: async (_event: ScheduledController, env: Env, ctx: ExecutionContext) => ctx.waitUntil(runScheduledSync(env)),

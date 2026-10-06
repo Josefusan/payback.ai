@@ -1,0 +1,44 @@
+/*
+ * Payback.ai brand tokens (L4). Single source of truth for colour, type and spacing.
+ * AG Grid cannot resolve CSS custom properties inside its colour maths, so the same hex
+ * values are mirrored literally in src/gridTheme.ts — keep the two files in step.
+ */
+:root {
+  --pb-bg: #f6f8fb;
+  --pb-surface: #ffffff;
+  --pb-surface-alt: #f8fafc;
+  --pb-ink: #0f172a;
+  --pb-ink-muted: #5b6b7f;
+  --pb-ink-subtle: #8494a8;
+  --pb-border: #e3e8ef;
+  --pb-border-strong: #cbd5e1;
+
+  --pb-navy: #0b2545;
+  --pb-navy-soft: #13315c;
+  --pb-accent: #0f766e;
+  --pb-accent-strong: #115e59;
+  --pb-accent-soft: #ccfbf1;
+
+  --pb-debit: #0f766e;
+  --pb-credit: #b45309;
+  --pb-positive: #15803d;
+  --pb-positive-soft: #dcfce7;
+  --pb-negative: #b91c1c;
+  --pb-negative-soft: #fee2e2;
+
+  --pb-radius-sm: 6px;
+  --pb-radius: 10px;
+  --pb-radius-lg: 14px;
+  --pb-shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
+  --pb-shadow: 0 6px 18px rgb(15 23 42 / 8%);
+
+  --pb-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --pb-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --pb-space-1: 4px;
+  --pb-space-2: 8px;
+  --pb-space-3: 12px;
+  --pb-space-4: 16px;
+  --pb-space-5: 24px;
+  --pb-space-6: 32px;
+}

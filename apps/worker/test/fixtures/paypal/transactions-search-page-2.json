@@ -1,0 +1,19 @@
+{
+  "transaction_details": [
+    {
+      "transaction_info": {
+        "paypal_account_id": "QYR5Z8XDVJNXQ",
+        "transaction_id": "7ZZ99887YY001122A",
+        "transaction_event_code": "T0400",
+        "transaction_initiation_date": "2026-10-03T14:30:05+0000",
+        "transaction_amount": { "currency_code": "USD", "value": "-200.00" },
+        "transaction_status": "S",
+        "transaction_subject": "Withdrawal to bank",
+        "paypal_reference_id_type": "TXN"
+      }
+    }
+  ],
+  "total_items": 3,
+  "total_pages": 2,
+  "page": 2
+}

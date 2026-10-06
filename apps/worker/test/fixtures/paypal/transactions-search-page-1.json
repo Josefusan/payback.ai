@@ -1,0 +1,64 @@
+{
+  "transaction_details": [
+    {
+      "transaction_info": {
+        "paypal_account_id": "QYR5Z8XDVJNXQ",
+        "transaction_id": "5TY05013RG002845M",
+        "transaction_event_code": "T0006",
+        "transaction_initiation_date": "2026-10-01T18:04:12+0000",
+        "transaction_updated_date": "2026-10-01T18:04:15+0000",
+        "transaction_amount": { "currency_code": "USD", "value": "49.00" },
+        "fee_amount": { "currency_code": "USD", "value": "-1.92" },
+        "transaction_status": "S",
+        "transaction_subject": "Payback.ai templates subscription",
+        "transaction_note": "Order 1043",
+        "invoice_id": "INV2-1043",
+        "custom_field": "templates",
+        "paypal_reference_id": "8MC585209K746392H",
+        "paypal_reference_id_type": "TXN",
+        "ending_balance": { "currency_code": "USD", "value": "1200.00" },
+        "available_balance": { "currency_code": "USD", "value": "1150.00" }
+      },
+      "payer_info": {
+        "account_id": "QYR5Z8XDVJNXQ",
+        "email_address": "ada@example.com",
+        "payer_name": { "given_name": "Ada", "surname": "Lovelace", "alternate_full_name": "Ada Lovelace" },
+        "country_code": "US"
+      },
+      "shipping_info": { "name": "Ada Lovelace" },
+      "cart_info": {
+        "item_details": [
+          {
+            "item_code": "TPL-STD",
+            "item_name": "Templates subscription",
+            "item_quantity": "1",
+            "item_amount": { "currency_code": "USD", "value": "49.00" }
+          }
+        ]
+      }
+    },
+    {
+      "transaction_info": {
+        "paypal_account_id": "QYR5Z8XDVJNXQ",
+        "transaction_id": "9AB12345CD006789X",
+        "transaction_event_code": "T1107",
+        "transaction_initiation_date": "2026-10-02T09:15:00+0000",
+        "transaction_amount": { "currency_code": "USD", "value": "-49.00" },
+        "fee_amount": { "currency_code": "USD", "value": "1.92" },
+        "transaction_status": "S",
+        "transaction_subject": "Refund for order 1043",
+        "transaction_note": "Customer refund",
+        "invoice_id": "INV2-1043",
+        "paypal_reference_id": "8MC585209K746392H",
+        "paypal_reference_id_type": "TXN"
+      },
+      "payer_info": {
+        "email_address": "ada@example.com",
+        "payer_name": { "alternate_full_name": "Ada Lovelace" }
+      }
+    }
+  ],
+  "total_items": 3,
+  "total_pages": 2,
+  "page": 1
+}

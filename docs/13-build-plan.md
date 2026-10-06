@@ -105,6 +105,7 @@ Fable 5.1 review (2026-10-05) consolidated the 10 `.claude/agents` role prompts 
 
 ### GATE — Compliance + Security / Scoring
 - Read-only, same tools, single pass per gate; reports findings as `Severity | file:line | issue | fix`.
+- Production architecture audit (`docs/14-production-audit.md`) runs at G1/G4/G5 via `python evals/architecture_audit.py` + the `architecture-auditor` agent; writes `docs/audit.md` (boundary ladder + six-pillar scorecard).
 - Scoring (`eval-judge`) runs **only** on schedule: weekly, pre-video, pre-submit.
 
 ### PARKED (do not start before G4 is green)
@@ -142,6 +143,7 @@ Each exit check is a command with expected output. A gate is green only when all
 - Exit: `docs/clef-response-sample.json` holds a real scrubbed response; `src/decision-provider.ts` exports `clef`, `fixture`, `fallback-llm`.
 - Exit: `scripts/seed-sandbox.*` v0 runs; ids appended to `docs/sandbox-activity.md`.
 - Exit: Worker deployed to a `*.workers.dev` URL (webhooks need a public endpoint; `wrangler dev` cannot receive them).
+- Exit: `python evals/architecture_audit.py` run; `docs/audit.md` written for G1; no pillar < 9 (audit `docs/14-production-audit.md`).
 - Unblocks: L1 pipeline tests, L2 evals on the real response shape, L4 fixture UI.
 
 ### G2 — End-to-end on seeded data · 2026-10-18
@@ -160,12 +162,14 @@ Each exit check is a command with expected output. A gate is green only when all
 - Exit: dashboard hosted from worker static assets; all six screens on live data.
 - Exit: AG Studio trial activated **on/after Oct 31** (45-day trial must survive to Dec 15).
 - Exit: Controller agent answers the product-line-profitability question from `/api/reports`.
+- Exit: architecture audit re-run; `docs/audit.md` current; every pillar ≥ 12/15.
 - Unblocks: L5 video recording.
 
 ### G5 — Polish & proof · 2026-11-08
 - Exit: fresh-clone → running in ≤ 10 min by someone who did not build it.
 - Exit: `python evals/llm_judge.py --strict` → mean ≥ 8.5, min ≥ 7.5, presentation ≥ 8.5.
 - Exit: video uploaded public; `submission/video.json` filled; `python evals/checks.py` → 0 hard failures, 0 pending.
+- Exit: `python evals/architecture_audit.py` → every pillar ≥ 12/15; `docs/audit.md` current for G5.
 - Unblocks: submission.
 
 ### G6 — Submit · 2026-11-10
@@ -347,6 +351,11 @@ Id scheme `T-<lane>-<nnn>`. Fields: gate · depends_on · criteria · dod · evi
 - dod: `docs/status.md` matches the shape in §7 after every gate.
 - evidence: `docs/status.md`.
 
+### T-INT-005 · Deploy worker to `*.workers.dev`
+- gate G1 · depends_on: T-INT-003 · criteria: C1, S6
+- dod: `wrangler deploy` succeeds; `GET /api/health` on the deployed URL returns 200; URL recorded in `docs/status.md` (webhooks need a public endpoint).
+- evidence: deployed URL in `docs/status.md`.
+
 ### T-GATE-001 · Compliance + security pass
 - gate every gate · depends_on: gate's lanes · criteria: R1–R15, S1, S7
 - dod: `python evals/checks.py` and the R1–R15 table; verdict line `SUBMITTABLE / NOT SUBMITTABLE`.
@@ -356,6 +365,26 @@ Id scheme `T-<lane>-<nnn>`. Fields: gate · depends_on · criteria · dod · evi
 - gate G2, G4, G5, weekly · depends_on: — · criteria: C1–C5, S1
 - dod: `python evals/llm_judge.py --strict`; feed `evals/out/judge.md` top-fixes to INT to re-rank the backlog.
 - evidence: `evals/out/judge.md`.
+
+### T-L3-007 · Move inline SQL out of `routes/ledger.ts` + `routes/reports.ts`
+- gate G1 · depends_on: T-L3-002 · criteria: C1 (audit R1)
+- dod: routes call L3 domain functions only; no `.prepare(`/`env.DB.batch(` in them; `evals/architecture_audit.py` `route_no_sql` passes.
+- evidence: `src/routes/ledger.ts`, `src/routes/reports.ts`, `evals/out/audit.json`.
+
+### T-L1-008 · Move inline SQL out of `routes/review.ts` + `routes/webhooks.ts`
+- gate G1 · depends_on: T-L1-003 · criteria: C1 (audit R1)
+- dod: as T-L3-007, for the L1 routes.
+- evidence: `src/routes/review.ts`, `src/routes/webhooks.ts`, `evals/out/audit.json`.
+
+### T-INT-006 · Register `app.onError` global exception handler
+- gate G1 · depends_on: T-INT-001 · criteria: C1 (audit R2)
+- dod: `index.ts` registers `app.onError`; an unhandled throw becomes one audited JSON 500.
+- evidence: `src/index.ts`.
+
+### T-INT-007 · Promote `route_no_sql` to a `evals/checks.py` gate rule
+- gate G1 · depends_on: T-L3-007, T-L1-008 · criteria: C1 (audit R3)
+- dod: `evals/checks.py` fails if any file under `src/routes/` contains `.prepare(`/`env.DB.batch(`.
+- evidence: `evals/checks.py`.
 
 ## 5. Criterion registry
 

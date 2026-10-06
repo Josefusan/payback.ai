@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="10">
+<meta name="color-scheme" content="dark">
+<title>Payback.ai G0 progress</title>
+
+<!-- ================================================================
+     STATE. The main session edits ONLY this block after every step.
+     Timestamps: paste output of  date "+%Y-%m-%dT%H:%M:%S%z"  (never invent).
+     status values: "todo" | "doing" | "done" | "stuck"
+     check values:  "pending" | "pass" | "fail"
+     ================================================================ -->
+<script>
+window.DASH = {
+  "title": "Payback.ai (PayPal AI Hackathon)",
+  "gate": "Gate G0: contract freeze",
+  "due": "2026-10-06",
+  "source": "joseph@13.140.171.233:~/Hackathons/paypal-hackathon (this page is a local mirror)",
+  "updated": "2026-10-05T13:46:17-0600",
+  "now": "G0 green and pushed. G1 waits on Cloudflare + PayPal sandbox credentials from Joseph.",
+  "tasks": [
+    {
+      "id": "1",
+      "ref": "T-INT-004",
+      "title": "Commit + push build plan and index link",
+      "status": "done",
+      "note": "9f4f416"
+    },
+    {
+      "id": "2",
+      "ref": "T-INT-001",
+      "title": "Split index.ts into per-lane route modules",
+      "status": "done",
+      "note": "7e15b0e"
+    },
+    {
+      "id": "3",
+      "ref": "T-INT-003",
+      "title": "Env/wrangler.jsonc INT-only change process",
+      "status": "done",
+      "note": "5ab3cac"
+    },
+    {
+      "id": "4",
+      "ref": "T-INT-002",
+      "title": "packages/contracts/api.ts v0 + 18 fixtures + coverage test",
+      "status": "done",
+      "note": "2aad4e8"
+    },
+    {
+      "id": "5",
+      "ref": "evals",
+      "title": "evals/dod.py runner (real checks, not a stub)",
+      "status": "done",
+      "note": "70431f3"
+    },
+    {
+      "id": "6",
+      "ref": "G0",
+      "title": "Verify G0 exit checks",
+      "status": "done",
+      "note": "dod.py --gate G0 \u2192 PASS"
+    },
+    {
+      "id": "7",
+      "ref": "T-INT-004",
+      "title": "status.md to \u00a77 shape, commit + push",
+      "status": "done",
+      "note": "pushed to origin/main"
+    }
+  ],
+  "checks": [
+    {
+      "name": "wrangler dev --local boots, /api/health 200",
+      "status": "pass",
+      "detail": "plain wrangler dev needs CLOUDFLARE_API_TOKEN (remote AI binding)"
+    },
+    {
+      "name": "d1 migrations apply --local",
+      "status": "pass",
+      "detail": "exit 0"
+    },
+    {
+      "name": "typecheck",
+      "status": "pass",
+      "detail": "tsc --noEmit clean"
+    },
+    {
+      "name": "tests",
+      "status": "pass",
+      "detail": "38/38 (was 18; +20 contract checks)"
+    }
+  ],
+  "commits": [
+    {
+      "sha": "9f4f416",
+      "msg": "Add build plan and sub-agent kickoff prompt",
+      "pushed": true,
+      "at": "2026-10-05T13:46:17-0600"
+    },
+    {
+      "sha": "7e15b0e",
+      "msg": "Split index.ts into per-lane route modules",
+      "pushed": true,
+      "at": "2026-10-05T13:46:17-0600"
+    },
+    {
+      "sha": "5ab3cac",
+      "msg": "Make Env and wrangler.jsonc INT-only",
+      "pushed": true,
+      "at": "2026-10-05T13:46:17-0600"
+    },
+    {
+      "sha": "2aad4e8",
+      "msg": "Add HTTP contract v0 with one fixture per endpoint",
+      "pushed": true,
+      "at": "2026-10-05T13:46:17-0600"
+    },
+    {
+      "sha": "70431f3",
+      "msg": "Add dod.py runner; G0 exit checks pass",
+      "pushed": true,
+      "at": "2026-10-05T13:46:17-0600"
+    }
+  ],
+  "questions": [
+    {
+      "id": "CF",
+      "ask": "Cloudflare auth for the VPS: wrangler login, or a CLOUDFLARE_API_TOKEN in a mode-600 file; create D1 payback; enable Workers AI",
+      "default_action": "L4 dashboard + L3 ledger work proceed on fixtures meanwhile",
+      "needed_by": "2026-10-09 (Clef spike, Q2)"
+    },
+    {
+      "id": "PP",
+      "ask": "PayPal sandbox app (Transaction search, Invoicing, Payouts) \u2014 write client id/secret to apps/worker/.dev.vars",
+      "default_action": "enable Transaction search at G1, accept ~3h lag",
+      "needed_by": "2026-10-11 (G1)"
+    },
+    {
+      "id": "Q1",
+      "ask": "Entrant type + Representative",
+      "default_action": "individual until decided",
+      "needed_by": "before G6 (2026-11-10)"
+    },
+    {
+      "id": "Q3",
+      "ask": "AG Studio license to Dec 15",
+      "default_action": "activate 45-day trial on Oct 31",
+      "needed_by": "2026-10-31"
+    }
+  ],
+  "deliverables": [
+    {
+      "label": "Build plan",
+      "path": "docs/13-build-plan.md",
+      "at": "2026-10-05T13:46:17-0600"
+    },
+    {
+      "label": "HTTP contract v0",
+      "path": "packages/contracts/api.ts",
+      "at": "2026-10-05T13:46:17-0600"
+    },
+    {
+      "label": "DoD runner",
+      "path": "evals/dod.py",
+      "at": "2026-10-05T13:46:17-0600"
+    },
+    {
+      "label": "Status",
+      "path": "docs/status.md",
+      "at": "2026-10-05T13:46:17-0600"
+    },
+    {
+      "label": "Repo",
+      "path": "https://github.com/Josefusan/payback.ai",
+      "at": "2026-10-05T13:46:17-0600"
+    }
+  ],
+  "stuck": [
+    {
+      "what": "G1 Clef spike + deploy",
+      "since": "2026-10-05T13:46:17-0600",
+      "next": "Joseph provides Cloudflare auth"
+    },
+    {
+      "what": "G1 PayPal sandbox sync",
+      "since": "2026-10-05T13:46:17-0600",
+      "next": "Joseph creates sandbox app + .dev.vars"
+    }
+  ]
+};
+</script>
+
+<style>
+  :root {
+    --bg: #0e1315;
+    --panel: #151c1f;
+    --line: #26323a;
+    --text: #e7eef0;
+    --muted: #a3b4b9;
+    --accent: #22a6ad;
+    --accent-text: #4cc6cc;
+    --amber: #f2b33d;
+    --red: #ff8a80;
+    --green: #7fd99a;
+    --radius: 12px;
+    --gap: 28px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  a { color: var(--accent-text); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; border-radius: 4px; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; overflow-wrap: anywhere; }
+
+  header {
+    border-bottom: 3px solid var(--accent);
+    background: var(--panel);
+    padding: 28px 24px 24px;
+    transition: border-color .2s;
+  }
+  header.stale { border-bottom-color: var(--amber); background: #231d10; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 1.6rem; line-height: 1.25; text-wrap: balance; }
+  .sub { color: var(--muted); margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-top: 18px; color: var(--muted); font-size: .95rem; }
+  .meta strong { color: var(--text); font-weight: 600; }
+  .stale-flag { color: var(--amber); font-weight: 700; }
+  .now { margin-top: 18px; padding: 14px 18px; border-left: 3px solid var(--accent); background: #10181b; border-radius: 6px; }
+  .now .k { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; }
+
+  main { padding: 32px 24px 64px; }
+  .grid { display: grid; gap: var(--gap); grid-template-columns: 1fr; }
+  @media (min-width: 900px) { .grid { grid-template-columns: 3fr 2fr; } .span2 { grid-column: 1 / -1; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; min-width: 0; }
+  h2 { margin: 0 0 16px; font-size: 1.05rem; letter-spacing: .02em; display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  h2 .count { color: var(--muted); font-weight: 400; font-size: .9rem; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li.row { padding: 14px 0; border-top: 1px solid var(--line); display: grid; gap: 4px 14px; grid-template-columns: auto 1fr; align-items: start; }
+  li.row:first-child { border-top: 0; padding-top: 0; }
+  .ref { color: var(--muted); font-size: .85rem; }
+  .note { color: var(--muted); font-size: .92rem; }
+  .empty { color: var(--muted); font-style: italic; margin: 0; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor; min-width: 76px; justify-content: center;
+  }
+  .s-todo    { color: var(--muted); }
+  .s-doing   { color: var(--accent-text); }
+  .s-done    { color: var(--green); }
+  .s-stuck   { color: var(--amber); }
+  .s-pending { color: var(--muted); }
+  .s-pass    { color: var(--green); }
+  .s-fail    { color: var(--red); }
+  li.is-done .title { color: var(--muted); }
+  li.is-doing .title { font-weight: 600; }
+
+  .bar { height: 8px; background: #0b1012; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin: 0 0 18px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+
+  .q-default { margin-top: 4px; font-size: .95rem; }
+  .q-default b { color: var(--accent-text); font-weight: 600; }
+  .stuck-item { border-left: 3px solid var(--amber); padding-left: 14px; }
+
+  @media (max-width: 520px) {
+    header { padding: 22px 16px 18px; }
+    main { padding: 22px 12px 48px; }
+    section { padding: 18px 16px; }
+    h1 { font-size: 1.35rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<header id="hdr">
+  <div class="wrap">
+    <h1 id="title"></h1>
+    <p class="sub" id="gate"></p>
+    <div class="meta" aria-live="polite">
+      <span>Due <strong id="due"></strong> <span id="duein"></span></span>
+      <span id="age"></span>
+      <span>Progress <strong id="prog"></strong></span>
+    </div>
+    <div class="now"><div class="k">Doing now</div><div id="now"></div></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="grid">
+    <section aria-labelledby="h-tasks">
+      <h2 id="h-tasks">Tasks <span class="count" id="task-count"></span></h2>
+      <div class="bar" role="img" id="bar-wrap"><span id="bar"></span></div>
+      <ul id="tasks"></ul>
+    </section>
+
+    <div style="display:grid; gap:var(--gap); align-content:start; min-width:0">
+      <section aria-labelledby="h-stuck">
+        <h2 id="h-stuck">Stuck <span class="count" id="stuck-count"></span></h2>
+        <ul id="stuck"></ul>
+      </section>
+      <section aria-labelledby="h-q">
+        <h2 id="h-q">Waiting on Joseph <span class="count" id="q-count"></span></h2>
+        <ul id="questions"></ul>
+      </section>
+    </div>
+
+    <section aria-labelledby="h-checks">
+      <h2 id="h-checks">G0 exit checks <span class="count" id="check-count"></span></h2>
+      <ul id="checks"></ul>
+    </section>
+
+    <section aria-labelledby="h-commits">
+      <h2 id="h-commits">Commits on VPS repo</h2>
+      <ul id="commits"></ul>
+    </section>
+
+    <section class="span2" aria-labelledby="h-del">
+      <h2 id="h-del">Latest deliverables</h2>
+      <ul id="deliverables"></ul>
+    </section>
+  </div>
+  <p class="note" style="margin-top:28px" id="source"></p>
+</main>
+
+<script>
+(function () {
+  var D = window.DASH || {};
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function $(id) { return document.getElementById(id); }
+  function parseTs(s) { if (!s) return null; var t = Date.parse(String(s).replace(/([+-]\d{2})(\d{2})$/, "$1:$2")); return isNaN(t) ? null : t; }
+  function chip(st) { return '<span class="chip s-' + esc(st) + '">' + esc(st) + '</span>'; }
+  function list(id, items, render, emptyText) {
+    $(id).innerHTML = items && items.length ? items.map(render).join("") : '<li><p class="empty">' + esc(emptyText) + '</p></li>';
+  }
+
+  $("title").textContent = D.title || "";
+  $("gate").textContent = D.gate || "";
+  $("due").textContent = D.due || "";
+  $("now").textContent = D.now || "Nothing in progress";
+  $("source").textContent = "Source of truth: " + (D.source || "");
+  document.title = (D.gate || "Dashboard") + " | " + (D.title || "");
+
+  var tasks = D.tasks || [];
+  var done = tasks.filter(function (t) { return t.status === "done"; }).length;
+  var pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+  $("prog").textContent = done + " of " + tasks.length + " done";
+  $("task-count").textContent = done + "/" + tasks.length;
+  $("bar").style.width = pct + "%";
+  $("bar-wrap").setAttribute("aria-label", pct + "% of tasks done");
+  list("tasks", tasks, function (t) {
+    return '<li class="row is-' + esc(t.status) + '">' + chip(t.status) +
+      '<div><div class="title">' + esc(t.id) + '. ' + esc(t.title) + '</div>' +
+      (t.ref ? '<div class="ref">' + esc(t.ref) + '</div>' : '') +
+      (t.note ? '<div class="note">' + esc(t.note) + '</div>' : '') + '</div></li>';
+  }, "No tasks");
+
+  var checks = D.checks || [];
+  $("check-count").textContent = checks.filter(function (c) { return c.status === "pass"; }).length + "/" + checks.length + " pass";
+  list("checks", checks, function (c) {
+    return '<li class="row">' + chip(c.status) + '<div><div>' + esc(c.name) + '</div>' +
+      (c.detail ? '<div class="note mono">' + esc(c.detail) + '</div>' : '') + '</div></li>';
+  }, "No checks");
+
+  list("commits", D.commits, function (c) {
+    return '<li class="row">' + chip(c.pushed ? "pushed" : "local").replace("s-pushed", "s-done").replace("s-local", "s-stuck") +
+      '<div><div><code>' + esc(c.sha) + '</code> ' + esc(c.msg) + '</div>' +
+      (c.at ? '<div class="ref">' + esc(c.at) + '</div>' : '') + '</div></li>';
+  }, "No commits recorded yet");
+
+  var qs = D.questions || [];
+  $("q-count").textContent = qs.length + " open";
+  list("questions", qs, function (q) {
+    return '<li class="row"><span class="chip s-doing">' + esc(q.id) + '</span><div><div>' + esc(q.ask) + '</div>' +
+      '<div class="q-default"><b>Default meanwhile:</b> ' + esc(q.default_action) + '</div>' +
+      (q.needed_by ? '<div class="ref">Needed by ' + esc(q.needed_by) + '</div>' : '') + '</div></li>';
+  }, "Nothing waiting on Joseph");
+
+  var st = D.stuck || [];
+  $("stuck-count").textContent = st.length ? st.length + " item" + (st.length > 1 ? "s" : "") : "none";
+  list("stuck", st, function (s) {
+    return '<li class="row"><span class="chip s-stuck">stuck</span><div class="stuck-item"><div>' + esc(s.what) + '</div>' +
+      '<div class="ref">Since ' + esc(s.since || "unknown") + '</div>' +
+      '<div class="note"><b>Next move:</b> ' + esc(s.next) + '</div></div></li>';
+  }, "Nothing stuck");
+
+  list("deliverables", D.deliverables, function (d) {
+    var p = esc(d.path);
+    var link = /^https?:\/\//.test(d.path || "") ? '<a href="' + p + '">' + p + '</a>' : '<code>' + p + '</code>';
+    return '<li class="row"><span class="chip s-done">ready</span><div><div>' + esc(d.label) + '</div><div>' + link + '</div>' +
+      (d.at ? '<div class="ref">' + esc(d.at) + '</div>' : '') + '</div></li>';
+  }, "No deliverables yet");
+
+  // Time: only the stamped value and the viewer's clock.
+  var upd = parseTs(D.updated);
+  function tick() {
+    var now = Date.now(), hdr = $("hdr"), age = $("age");
+    if (upd == null) {
+      hdr.classList.add("stale");
+      age.innerHTML = '<span class="stale-flag">Not stamped yet: waiting for first update</span>';
+    } else {
+      var s = Math.max(0, Math.round((now - upd) / 1000));
+      var txt = s < 90 ? s + " s ago" : s < 5400 ? Math.round(s / 60) + " min ago" : Math.round(s / 3600) + " h ago";
+      var stale = s > 600;
+      hdr.classList.toggle("stale", stale);
+      age.innerHTML = 'Updated <strong>' + txt + '</strong>' + (stale ? ' <span class="stale-flag">STALE (over 10 min)</span>' : '');
+    }
+    if (D.due) {
+      var d = new Date(now);
+      var today = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      var days = Math.round((Date.parse(D.due + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000);
+      $("duein").textContent = days > 1 ? "(" + days + " days left)" : days === 1 ? "(tomorrow)" : days === 0 ? "(due today)" : "(overdue)";
+    }
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>

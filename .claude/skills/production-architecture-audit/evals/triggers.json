@@ -1,0 +1,11 @@
+{
+  "skill": "production-architecture-audit",
+  "test_cases": [
+    {"input": "Run the production architecture audit on this plan", "should_trigger": true},
+    {"input": "Where does this sit on the boundary ladder, level 0 or modular monolith?", "should_trigger": true},
+    {"input": "Score separation of concerns, migrations, and the expand/contract pattern against the audit PDF", "should_trigger": true},
+    {"input": "gold standard vs floor for Zevar i data access", "should_trigger": true},
+    {"input": "Write a cold email for a roofing client", "should_trigger": false},
+    {"input": "Find the cash bottleneck in this funnel", "should_trigger": false}
+  ]
+}
