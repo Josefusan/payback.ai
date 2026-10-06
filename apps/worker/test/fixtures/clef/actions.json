@@ -1,0 +1,11 @@
+{
+  "note": "Recorded Clef action-consistency answers (P(action is justified by verifiable records)). Keys are action `type` values.",
+  "schema_version": "txn-v1",
+  "actions": {
+    "payout": 0.12,
+    "refund": 0.41,
+    "invoice_reminder": 0.96,
+    "invoice_create": 0.55,
+    "dispute_accept": 0.08
+  }
+}

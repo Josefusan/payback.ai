@@ -53,6 +53,13 @@ TASKS: dict[str, list[tuple]] = {
         ("exists", "docs/13-build-plan.md"),
         ("cmd", ["grep", "-q", "^## Eval snapshot", "docs/status.md"], ".", 0),
     ],
+    "T-L2-002": [
+        TSC, VITEST,
+        ("exists", f"{W}/src/decision-provider.ts"),
+        ("exists", f"{W}/test/fixtures/clef"),
+        ("cmd", ["grep", "-q", "fallback-llm", f"{W}/src/decision-provider.ts"], ".", 0),
+        ("cmd", ["npx", "vitest", "run", "src/decision-provider.test.ts"], W, 0),
+    ],
 }
 
 GATES: dict[str, list[tuple]] = {

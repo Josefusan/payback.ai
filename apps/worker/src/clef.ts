@@ -2,16 +2,23 @@
  * Cloudflare Clef decision layer. See .claude/skills/cloudflare-clef/SKILL.md
  * Request/response shapes follow Cloudflare's Oct 2026 launch material — confirm against a real response on day 1
  * (save it to docs/clef-response-sample.json) and adjust the types below if needed.
+ *
+ * This module owns the decision schema (SCHEMA_VERSION, questions, gating) and the RAW Clef call.
+ * Provider selection lives in ./decision-provider; `decideTransaction`/`decideAction` below are the frozen
+ * IF-05 entry points (owner L2) and route through the active DecisionProvider. They never throw: any
+ * provider error becomes a `review` decision (R4, INV-4).
  */
 import type { Env } from "./env";
 import { CLEF_ACCOUNT_CRITERIA, PRODUCT_LINES } from "./coa";
+import { selectProvider } from "./decision-provider";
 
 export const SCHEMA_VERSION = "txn-v1";
 
-type ChoiceAnswer = { type: "choice"; choice: string; probabilities: Record<string, number>; confidence?: number };
-type NoulAnswer = { type: "noul"; noul: number };
-type ScoreAnswer = { type: "score"; score: number; probabilities?: Record<string, number> };
-type Answer = ChoiceAnswer | NoulAnswer | ScoreAnswer;
+export type ChoiceAnswer = { type: "choice"; choice: string; probabilities: Record<string, number>; confidence?: number };
+export type NoulAnswer = { type: "noul"; noul: number };
+export type ScoreAnswer = { type: "score"; score: number; probabilities?: Record<string, number> };
+export type ClefAnswer = ChoiceAnswer | NoulAnswer | ScoreAnswer;
+export type ClefAnswers = Record<string, ClefAnswer | undefined>;
 
 export interface TxnForDecision {
   event_code: string;
@@ -74,16 +81,21 @@ export function buildTxnRequest(txn: TxnForDecision, model: string) {
   };
 }
 
-function isProb(x: unknown): x is number {
+export function isProb(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1;
 }
 
-function validChoice(a: Answer | undefined, allowed: string[]): a is ChoiceAnswer {
+export function defaultThreshold(env: Env): number {
+  const n = Number(env.AUTO_POST_THRESHOLD || "0.9");
+  return Number.isFinite(n) ? n : 0.9;
+}
+
+function validChoice(a: ClefAnswer | undefined, allowed: string[]): a is ChoiceAnswer {
   return !!a && a.type === "choice" && allowed.includes(a.choice) && isProb(a.probabilities?.[a.choice]);
 }
 
 export function gateDecision(
-  answers: Record<string, Answer | undefined>,
+  answers: ClefAnswers,
   threshold: number,
 ): Pick<TxnDecision, "account" | "productLine" | "needsReview" | "risk" | "gate" | "gateReasons"> {
   const reasons: string[] = [];
@@ -110,17 +122,32 @@ export function gateDecision(
   return { account, productLine, needsReview, risk, gate: reasons.length ? "review" : "auto", gateReasons: reasons };
 }
 
-async function runClef(env: Env, model: string, payload: unknown): Promise<Record<string, Answer | undefined>> {
+/** Build a hard "review" decision (no probability mass) for any failure path. Never throws. */
+export function reviewDecisionFor(threshold: number, model: string, reasons: string[]): TxnDecision {
+  return {
+    model,
+    schemaVersion: SCHEMA_VERSION,
+    threshold,
+    account: { choice: "review", probabilities: {} },
+    productLine: { choice: "none", probabilities: {} },
+    needsReview: 1,
+    risk: 3,
+    gate: "review",
+    gateReasons: reasons.length ? reasons : ["review"],
+  };
+}
+
+export async function runClef(env: Env, model: string, payload: unknown): Promise<ClefAnswers> {
   const opts = env.AI_GATEWAY_ID ? { gateway: { id: env.AI_GATEWAY_ID } } : undefined;
   // The Workers AI types may not know the Clef model id yet; cast is intentional and isolated here.
-  const run = env.AI.run as unknown as (m: string, input: unknown, o?: unknown) => Promise<{ answers?: Record<string, Answer> }>;
+  const run = env.AI.run as unknown as (m: string, input: unknown, o?: unknown) => Promise<{ answers?: ClefAnswers }>;
   const out = await run(model, payload, opts);
   return out.answers ?? {};
 }
 
-/** Decide one transaction: clef-flash first, escalate to clef (27B) when uncertain. Never throws — failures route to review. */
-export async function decideTransaction(env: Env, txn: TxnForDecision): Promise<TxnDecision> {
-  const threshold = Number(env.AUTO_POST_THRESHOLD || "0.9");
+/** Raw Clef path: clef-flash first, escalate to clef (27B) when uncertain. Never throws — failures route to review. */
+export async function clefDecideTransaction(env: Env, txn: TxnForDecision): Promise<TxnDecision> {
+  const threshold = defaultThreshold(env);
   let model = env.CLEF_MODEL;
   try {
     let answers = await runClef(env, model, buildTxnRequest(txn, model));
@@ -133,16 +160,12 @@ export async function decideTransaction(env: Env, txn: TxnForDecision): Promise<
     }
     return { model, schemaVersion: SCHEMA_VERSION, threshold, ...gated };
   } catch (err) {
-    return {
-      model, schemaVersion: SCHEMA_VERSION, threshold,
-      account: { choice: "review", probabilities: {} }, productLine: { choice: "none", probabilities: {} },
-      needsReview: 1, risk: 3, gate: "review", gateReasons: [`clef_error:${(err as Error).message}`],
-    };
+    return reviewDecisionFor(threshold, model, [`clef_error:${(err as Error).message}`]);
   }
 }
 
-/** Action decision: is a proposed money-moving action consistent with evidence and policy? Returns P(yes). */
-export async function decideAction(env: Env, context: string, proposal: Record<string, unknown>): Promise<number> {
+/** Raw Clef action decision: is a proposed money-moving action consistent with evidence and policy? Returns P(yes). */
+export async function clefDecideAction(env: Env, context: string, proposal: Record<string, unknown>): Promise<number> {
   const model = env.CLEF_ESCALATION_MODEL || env.CLEF_MODEL;
   try {
     const answers = await runClef(env, model, {
@@ -157,6 +180,27 @@ export async function decideAction(env: Env, context: string, proposal: Record<s
     });
     const a = answers.consistent;
     return a && a.type === "noul" && isProb(a.noul) ? a.noul : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * IF-05 decision of record. Routes through the active DecisionProvider (clef | fixture | fallback-llm).
+ * Never throws: a provider error becomes gate="review" so the transaction reaches the human queue.
+ */
+export async function decideTransaction(env: Env, txn: TxnForDecision): Promise<TxnDecision> {
+  try {
+    return await selectProvider(env).decideTransaction(txn);
+  } catch (err) {
+    return reviewDecisionFor(defaultThreshold(env), "review", [`provider_error:${(err as Error).message}`]);
+  }
+}
+
+/** IF-05 action decision of record. Never throws: a provider error returns 0 → policy routes to review. */
+export async function decideAction(env: Env, context: string, proposal: Record<string, unknown>): Promise<number> {
+  try {
+    return await selectProvider(env).decideAction(context, proposal);
   } catch {
     return 0;
   }
