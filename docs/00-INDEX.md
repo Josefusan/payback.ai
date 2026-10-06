@@ -19,6 +19,7 @@ For humans and AI agents. Start with 07 (what) → 01/02 (rules & success) → 1
 | [13-build-plan.md](13-build-plan.md) | **Build plan & sub-agent kickoff prompt** — lanes, interfaces, gates, task registry, PM protocol |
 | [14-production-audit.md](14-production-audit.md) | **Production architecture audit process** — boundary ladder + six-pillar scorecard, cadence G1/G4/G5 |
 | [15-roadmap.md](15-roadmap.md) | **Finish roadmap** — requirements → evidence traceability, critical path, phased plan, blockers, cut lines |
+| [17-handoff.md](17-handoff.md) | **Handoff — resume here.** Verified state, R2 critical-path status, blockers, next actions, deadlines (supersedes [16-r2-session-report.md](16-r2-session-report.md) on commit state) |
 | [status.md](status.md) · [decisions.md](decisions.md) · [rulings.md](rulings.md) | Living logs |
 | [sandbox-activity.md](sandbox-activity.md) · [tooling.md](tooling.md) | Sandbox data ledger; installed plugins/MCP |
 
