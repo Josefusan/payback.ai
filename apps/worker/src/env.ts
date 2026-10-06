@@ -16,6 +16,9 @@ export interface Env {
   ACTION_THRESHOLD: string;
   AUTONOMOUS_PAYOUT_LIMIT_CENTS: string;
   AI_GATEWAY_ID: string;
+
+  DECISION_PROVIDER: string; // "clef" | "fixture" | "fallback-llm" (default "clef"; prod = clef)
+  FALLBACK_LLM_MODEL: string; // Workers AI text model for the fallback-llm provider
 }
 
 export type SyncMessage =
