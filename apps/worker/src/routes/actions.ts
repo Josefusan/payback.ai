@@ -3,6 +3,7 @@
 import { Hono, type Context } from "hono";
 import type { ActionApproveResponse, ActionsResponse } from "../../../../packages/contracts/api";
 import { executeProposal, getAction, isActionOutcome, listActions } from "../actions";
+import { requireAdmin } from "../auth";
 import type { AppEnv } from "../env";
 import type { ActionProposal } from "../policy";
 
@@ -39,6 +40,9 @@ actions.get("/api/actions", async (c) => {
 // Human approval of a review-queued action: the SAME executeProposal production and the eval use, with
 // dryRun=false and the approver recorded. `blocked` rows are refused — approval cannot override policy.
 // The review→executed transition is atomic inside executeProposal, so two concurrent approvals pay once.
+// Human approval can move real sandbox money, so it is gated on the shared admin token (G3).
+// The reviewer identity in the body is still recorded on the row; this guards who can reach the endpoint.
+actions.use("/api/actions/:id/approve", requireAdmin);
 actions.post("/api/actions/:id/approve", async (c) => {
   const id = parseId(c.req.param("id"));
   if (id === null) return c.json({ error: "invalid_id" }, 400);

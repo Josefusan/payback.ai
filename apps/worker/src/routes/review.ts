@@ -2,6 +2,7 @@
 import { Hono, type Context } from "hono";
 import type { ReviewResolveResponse, ReviewResponse } from "../../../../packages/contracts/api";
 import { listOpenReviewItems, resolveReviewItem } from "../actions";
+import { requireAdmin } from "../auth";
 import type { AppEnv } from "../env";
 
 export const review = new Hono<AppEnv>();
@@ -29,6 +30,8 @@ review.get("/api/review", async (c) => {
   return c.json(rows);
 });
 
+// Resolving a review item mutates the queue, so it is gated on the shared admin token (G3).
+review.use("/api/review/:id/resolve", requireAdmin);
 review.post("/api/review/:id/resolve", async (c) => {
   const id = parseId(c.req.param("id"));
   if (id === null) return c.json({ error: "invalid_id" }, 400);

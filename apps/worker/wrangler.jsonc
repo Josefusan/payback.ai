@@ -34,6 +34,6 @@
     "DECISION_PROVIDER": "clef",
     "FALLBACK_LLM_MODEL": "@cf/meta/llama-3.1-8b-instruct"
   }
-  // Secrets (never here): wrangler secret put PAYPAL_CLIENT_ID | PAYPAL_CLIENT_SECRET | PAYPAL_WEBHOOK_ID
+  // Secrets (never here): wrangler secret put PAYPAL_CLIENT_ID | PAYPAL_CLIENT_SECRET | PAYPAL_WEBHOOK_ID | ADMIN_TOKEN
   // Local dev: copy .dev.vars.example → .dev.vars (gitignored)
 }

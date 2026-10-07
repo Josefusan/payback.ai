@@ -82,7 +82,7 @@ related: [docs/15-roadmap.md, docs/16-r2-session-report.md, docs/04-submission-c
 3. **T-INT-005 — deploy:** `cd apps/worker && npx wrangler deploy` → `*.workers.dev`; paste `database_id` into `wrangler.jsonc`; `wrangler secret put` the PayPal secrets. A public URL also unblocks **T-L1-003** (webhook verify + dedupe + enqueue).
 4. **T-L1-002 — seed script v0** (orders, refund, invoices, payout, dispute) → append ids to `docs/sandbox-activity.md`.
 5. **Live opening-balance tie-out** (T-L3-001) against real sandbox Balances — the #1 on-camera risk.
-6. **Fix the G3 auth gap** (Med, pre-hosting): `POST /api/actions/:id/approve` executes a real sandbox payout with no auth; `/api/sync`, `/api/review/:id/resolve`, `/api/eval/*` are open. Add a shared admin token or Cloudflare Access.
+6. **Fix the G3 auth gap** (Med, pre-hosting): `POST /api/actions/:id/approve` executes a real sandbox payout with no auth; `/api/sync`, `/api/review/:id/resolve`, `/api/eval/*` are open. Add a shared admin token or Cloudflare Access. **(done 2026-10-07 — shared `ADMIN_TOKEN`, see §9; set it with `wrangler secret put ADMIN_TOKEN` at deploy.)**
 7. **Run the never-run evals** — `product_evals.py` and `llm_judge.py`. Every precision/safety/judge claim (A10/A11/A12) is currently **unfalsified**: `evals/out/` has no `product.json` and no `judge.md`. Grow the dataset 30 → ≥150 rows (≥30% held out).
 8. **T-L5-005 video** (≤2:50, public YouTube) + T-L5-003 Devpost description + T-L5-004 Postman. Storyboard early — the video is the product.
 9. **Flip the repo public**; MIT `LICENSE` in About; `python evals/checks.py --github Josefusan/payback.ai` → PASS.
@@ -119,7 +119,7 @@ reviews: `t_41337658` (PASS + 8 findings), `t_b302c99e` (PASS + 2 Low).
 
 ## 9. Carried-over findings (not gate blockers)
 
-- **Med** — unauthenticated mutating endpoints (see §5.6).
+- **Med — mutating endpoints unauthenticated.** *(Addressed 2026-10-07.)* A shared `ADMIN_TOKEN` now gates `POST /api/sync`, `/api/review/:id/resolve`, `/api/actions/:id/approve` and `/api/eval/*` via `apps/worker/src/auth.ts` (`requireAdmin`, fail-closed 503 when unset, `X-Admin-Token` or `Authorization: Bearer`). Read-only GETs stay open for the judge dashboard. Set `wrangler secret put ADMIN_TOKEN` at deploy; run `product_evals.py` with `PAYBACK_ADMIN_TOKEN` exported. Pending a GATE re-review.
 - **Low** — residual concurrent-approval race; money-safe via the deterministic `PayPal-Request-Id` (a second PayPal call still moves money only once).
 - **Info** — `checks.py` cosmetics: `route_no_sql` globs only `apps/worker/src/routes/*.ts`; `check_tests` counts tracked files only.
 

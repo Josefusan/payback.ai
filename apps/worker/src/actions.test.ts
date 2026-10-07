@@ -23,6 +23,7 @@ const SANDBOX = "https://api-m.sandbox.paypal.com";
 const PAYOUT_PATH = "/v1/payments/payouts";
 const PAYOUT_BATCH_ID = "BATCH-9F2K1";
 const APPROVER = "controller@payback.ai";
+const ADMIN = "test-admin-token";
 
 interface Call {
   url: string;
@@ -58,6 +59,7 @@ const asEnv = (db: TestD1): Env =>
     PAYPAL_ENV: "sandbox",
     PAYPAL_CLIENT_ID: "AZfixture-client-id",
     PAYPAL_CLIENT_SECRET: "EKfixture-secret",
+    ADMIN_TOKEN: ADMIN,
   }) as Env;
 
 const PAYOUT = (over: Partial<ActionProposal> = {}): ActionProposal => ({
@@ -345,7 +347,7 @@ describe("routes/actions — GET /api/actions, POST /api/actions/:id/approve", (
 
     const res = await app().request(
       `/api/actions/${queued.id}/approve`,
-      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ by: APPROVER }) },
+      { method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN }, body: JSON.stringify({ by: APPROVER }) },
       env,
     );
     expect(res.status).toBe(200);
@@ -353,10 +355,10 @@ describe("routes/actions — GET /api/actions, POST /api/actions/:id/approve", (
     expect(body).toEqual({ ok: true, outcome: "executed", paypal_ref: PAYOUT_BATCH_ID });
     expect(await getAction(env, queued.id)).toMatchObject({ outcome: "executed", approver: APPROVER });
 
-    const missing = await app().request("/api/actions/999/approve", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ by: APPROVER }) }, env);
+    const missing = await app().request("/api/actions/999/approve", { method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN }, body: JSON.stringify({ by: APPROVER }) }, env);
     expect(missing.status).toBe(404);
 
-    const done = await app().request(`/api/actions/${queued.id}/approve`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ by: APPROVER }) }, env);
+    const done = await app().request(`/api/actions/${queued.id}/approve`, { method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN }, body: JSON.stringify({ by: APPROVER }) }, env);
     expect((await done.json()) as ActionApproveResponse).toMatchObject({ ok: false, outcome: "executed", error: "not_awaiting_approval" });
   });
 });
@@ -367,7 +369,7 @@ describe("routes/eval — POST /api/eval/action runs the production path with dr
   const post = (context: string) =>
     app().request(
       "/api/eval/action",
-      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ context, proposal: PAYOUT(), run_id: "run-42" }) },
+      { method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN }, body: JSON.stringify({ context, proposal: PAYOUT(), run_id: "run-42" }) },
       env,
     );
 
@@ -390,7 +392,7 @@ describe("routes — request hardening (finding #3)", () => {
   const actionsApp = () => new Hono<AppEnv>().route("/", actionRoutes);
   const reviewApp = () => new Hono<AppEnv>().route("/", reviewRoutes);
   const post = (app: Hono<AppEnv>, path: string, body: BodyInit) =>
-    app.request(path, { method: "POST", headers: { "content-type": "application/json" }, body }, env);
+    app.request(path, { method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN }, body }, env);
 
   it("approve: malformed/missing bodies and bad ids are 400; an unknown id is 404", async () => {
     const queued = await executeProposal(env, PAYOUT({ amount_cents: 250_000, bill_id: "B-80" }), { dryRun: true, context: "above the limit" });
@@ -418,5 +420,45 @@ describe("routes — request hardening (finding #3)", () => {
 
     // resolveReviewItem returns false once the item is no longer open → a 404, not a silent ok.
     expect((await post(reviewApp(), "/api/review/1/resolve", JSON.stringify({ status: "rejected", by: APPROVER }))).status).toBe(404);
+  });
+});
+
+describe("auth — shared admin token guards mutating routes (G3)", () => {
+  const actionsApp = () => new Hono<AppEnv>().route("/", actionRoutes);
+  const reviewApp = () => new Hono<AppEnv>().route("/", reviewRoutes);
+  const evalApp = () => new Hono<AppEnv>().route("/", evalRoutes);
+  const post = (app: Hono<AppEnv>, path: string, body: unknown, headers: Record<string, string> = {}) =>
+    app.request(path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) }, env);
+
+  it("rejects a money-moving request with no token or a wrong token, and never reaches PayPal", async () => {
+    const queued = await executeProposal(env, PAYOUT({ amount_cents: 250_000, bill_id: "B-80" }), { dryRun: true, context: "above the limit" });
+    const path = `/api/actions/${queued.id}/approve`;
+
+    expect((await post(actionsApp(), path, { by: APPROVER })).status).toBe(401);
+    expect((await post(actionsApp(), path, { by: APPROVER }, { "x-admin-token": "wrong-token" })).status).toBe(401);
+    expect(payoutCalls(pp.calls)).toHaveLength(0); // an unauthenticated request moved no money
+  });
+
+  it("accepts the token via X-Admin-Token and via Authorization: Bearer", async () => {
+    await db.prepare(`INSERT INTO review_queue (kind, ref_id, reasons, payload_json) VALUES ('action', 'B-80', '[]', '{}')`).run();
+    await db.prepare(`INSERT INTO review_queue (kind, ref_id, reasons, payload_json) VALUES ('action', 'B-81', '[]', '{}')`).run();
+
+    const viaHeader = await post(reviewApp(), "/api/review/1/resolve", { status: "approved", by: APPROVER }, { "x-admin-token": ADMIN });
+    expect(viaHeader.status).toBe(200);
+    const viaBearer = await post(reviewApp(), "/api/review/2/resolve", { status: "approved", by: APPROVER }, { authorization: `Bearer ${ADMIN}` });
+    expect(viaBearer.status).toBe(200);
+  });
+
+  it("guards /api/eval/* with the same token", async () => {
+    expect((await post(evalApp(), "/api/eval/decide", {})).status).toBe(401);
+  });
+
+  it("fails closed (503 auth_not_configured) when the token is unset", async () => {
+    const noToken = { ...env, ADMIN_TOKEN: "" } as Env;
+    const res = await new Hono<AppEnv>()
+      .route("/", actionRoutes)
+      .request("/api/actions/1/approve", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ by: APPROVER }) }, noToken);
+    expect(res.status).toBe(503);
+    expect((await res.json()) as { error: string }).toEqual({ error: "auth_not_configured" });
   });
 });

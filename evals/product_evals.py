@@ -30,6 +30,9 @@ HERE = Path(__file__).resolve().parent
 OUT = HERE / "out"
 TARGETS = {"auto_precision": 0.97, "review_rate_max": 0.25, "ece_max": 0.05, "review_recall_min": 0.9}
 NEEDS_REVIEW_CUTOFF = 0.30
+# The worker gates POST /api/eval/* on the shared admin token (G3). Export PAYBACK_ADMIN_TOKEN to run
+# against a worker; absent, the worker answers 401/503 and the eval fails loudly.
+ADMIN_TOKEN = os.environ.get("PAYBACK_ADMIN_TOKEN")
 
 
 def load(name: str) -> list[dict]:
@@ -37,8 +40,10 @@ def load(name: str) -> list[dict]:
 
 
 def post(url: str, payload: dict) -> dict:
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST",
-                                 headers={"content-type": "application/json"})
+    headers = {"content-type": "application/json"}
+    if ADMIN_TOKEN:
+        headers["x-admin-token"] = ADMIN_TOKEN
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST", headers=headers)
     with urllib.request.urlopen(req, timeout=60) as r:
         return json.loads(r.read())
 

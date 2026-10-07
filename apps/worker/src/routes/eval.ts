@@ -2,11 +2,17 @@
 import { Hono } from "hono";
 import type { ActionOutcome, EvalActionResponse } from "../../../../packages/contracts/api";
 import { actionProbOf, executeProposal } from "../actions";
+import { requireAdmin } from "../auth";
 import { decideTransaction, type TxnForDecision } from "../clef";
 import type { AppEnv } from "../env";
 import type { ActionProposal } from "../policy";
 
 export const evalRoutes = new Hono<AppEnv>();
+
+// The eval endpoints drive the production money path with dryRun and write real rows (scoped by run_id),
+// so they are gated on the shared admin token (G3) rather than left open.
+evalRoutes.use("/api/eval/decide", requireAdmin);
+evalRoutes.use("/api/eval/action", requireAdmin);
 
 evalRoutes.post("/api/eval/decide", async (c) => {
   const { txn } = await c.req.json<{ txn: TxnForDecision }>();

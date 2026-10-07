@@ -134,6 +134,37 @@ describe("failure handling (INV-4 / R4)", () => {
   });
 });
 
+/* ---------------------------------------------------------- fallback-llm */
+
+describe("fallback-llm provider (Q2 — ready if Clef is unavailable)", () => {
+  // A text model asked for the Clef answer schema; it answers with minified JSON (documented contract).
+  const answeringAi = {
+    run: async (_model: string, input: { messages: Array<{ role: string; content: string }> }) => {
+      const last = input.messages[input.messages.length - 1]?.content ?? "";
+      const isAction = last.includes('"consistent"');
+      return {
+        response: isAction
+          ? '{"consistent":0.97}'
+          : '{"account":{"type":"choice","choice":"4000","probabilities":{"4000":0.98}},"needs_review":{"type":"noul","noul":0.05},"risk":{"type":"score","score":1}}',
+      };
+    },
+  };
+
+  it("decodes a transaction answer into the Clef schema and gates like production", async () => {
+    configureDecisionProviders({ provider: "fallback-llm" });
+    const d = await decideTransaction(makeEnv(answeringAi), TXN);
+    expect(d.gate).toBe("auto");
+    expect(d.account.choice).toBe("4000");
+    expect(d.model).toBe("fallback:@cf/meta/llama-3.1-8b-instruct");
+  });
+
+  it("decodes an action probability for the policy gate", async () => {
+    configureDecisionProviders({ provider: "fallback-llm" });
+    const prob = await decideAction(makeEnv(answeringAi), "Approved bill #B-77 from an allow-listed contractor", { type: "payout" });
+    expect(prob).toBeCloseTo(0.97);
+  });
+});
+
 /* ---------------------------------------------------- end-to-end pipeline */
 
 interface RecordedStmt {

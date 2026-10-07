@@ -10,6 +10,8 @@ export interface Env {
   PAYPAL_CLIENT_SECRET: string;
   PAYPAL_WEBHOOK_ID: string;
 
+  ADMIN_TOKEN: string; // shared secret gating mutating routes (G3); wrangler secret put ADMIN_TOKEN
+
   CLEF_MODEL: string; // @cf/cloudflare/clef-flash
   CLEF_ESCALATION_MODEL: string; // @cf/cloudflare/clef
   AUTO_POST_THRESHOLD: string;

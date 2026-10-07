@@ -2,6 +2,9 @@
 PAYPAL_CLIENT_ID=your_sandbox_client_id
 PAYPAL_CLIENT_SECRET=your_sandbox_client_secret
 PAYPAL_WEBHOOK_ID=your_sandbox_webhook_id
+# Shared admin token gating mutating routes (POST /api/sync, /api/review/:id/resolve, /api/actions/:id/approve, /api/eval/*).
+# Any long random string. At deploy: wrangler secret put ADMIN_TOKEN. Leave unset locally to exercise the fail-closed 503.
+ADMIN_TOKEN=
 # Decision provider: "clef" (live, prod default) | "fixture" (recorded replay) | "fallback-llm" (Workers AI text model)
 DECISION_PROVIDER=clef
 # Workers AI text model used by the fallback-llm provider
