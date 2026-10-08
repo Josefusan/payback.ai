@@ -1,0 +1,13 @@
+{
+  "name": "payback",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Payback.ai — an autonomous back office for PayPal: sync the sandbox, classify each transaction with Cloudflare Workers AI (Clef), post balanced double-entry journals, and gate anything uncertain to a human. This root package exists only to host the sandbox seed script; the app itself is in apps/worker and apps/web.",
+  "scripts": {
+    "seed": "node scripts/seed-sandbox.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0"
+  }
+}
