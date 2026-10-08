@@ -44,7 +44,6 @@ export function AppHeader({ screen, onSelect }: AppHeaderProps) {
         Payback<span>.ai</span>
       </div>
       <span className="badge badge--sandbox">PayPal sandbox</span>
-      <span className="badge badge--live-off">Fixtures only (no live API yet)</span>
       <nav className="app-nav" aria-label="Dashboard screens">
         {LIVE_SCREENS.map((item) => (
           <LiveNavItem key={item.id} item={item} current={screen === item.id} onSelect={onSelect} />

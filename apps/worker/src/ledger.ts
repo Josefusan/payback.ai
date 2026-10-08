@@ -367,3 +367,49 @@ export async function reportsPnl(env: Env): Promise<PnlRow[]> {
   ).all<PnlRow>();
   return results;
 }
+
+/** `GET /api/ledger/:id` — one journal entry with its lines, for the dashboard's row drill-through. */
+export interface LedgerEntryRow {
+  id: number;
+  source: string;
+  source_id: string | null;
+  entry_date: string;
+  memo: string | null;
+  decision_id: number | null;
+  reverses_entry_id: number | null;
+  lines: Array<{
+    account_code: string;
+    account_name: string;
+    debit_cents: number;
+    credit_cents: number;
+    currency: string;
+    product_line: string | null;
+    counterparty: string | null;
+  }>;
+}
+
+/**
+ * The entry header and its lines. `source`, `decision_id` and `reverses_entry_id` are not derivable from
+ * a flat ledger line, which is why the drill-through needs its own read rather than reusing listLedgerLines.
+ * Returns null for an unknown id so the route can answer 404 instead of an empty entry.
+ */
+export async function getLedgerEntry(env: Env, id: number): Promise<LedgerEntryRow | null> {
+  const head = await env.DB.prepare(
+    `SELECT id, source, source_id, entry_date, memo, decision_id, reverses_entry_id
+       FROM journal_entries WHERE id = ?`,
+  )
+    .bind(id)
+    .first<Omit<LedgerEntryRow, "lines">>();
+  if (!head) return null;
+
+  const { results } = await env.DB.prepare(
+    `SELECT l.account_code, a.name AS account_name, l.debit_cents, l.credit_cents, l.currency,
+            l.product_line, l.counterparty
+       FROM journal_lines l JOIN accounts a ON a.code = l.account_code
+      WHERE l.entry_id = ? ORDER BY l.id`,
+  )
+    .bind(id)
+    .all<LedgerEntryRow["lines"][number]>();
+
+  return { ...head, lines: results };
+}

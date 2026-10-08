@@ -6,6 +6,15 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
+  // Static dashboard (apps/web). Build with `npm run build` in apps/web, then `npx wrangler deploy`
+  // from here uploads it too: one deploy serves the app and its API from the same origin, so the
+  // dashboard needs no API host and there is no CORS to configure. Requests that match no asset
+  // (everything under /api and /webhooks) fall through to the Worker below.
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS"
+  },
+
   // Workers AI — Clef decision models (@cf/cloudflare/clef, @cf/cloudflare/clef-flash)
   "ai": { "binding": "AI" },
 

@@ -1,15 +1,40 @@
-import { arAging, pnlByProduct, reconcileRows } from "../data/reports";
-import { FIXTURE_SOURCE } from "../data/fixtures";
+import { useMemo } from "react";
+
+import { LEDGER_PATH, loadLedger, loadPnl, loadReconcile, PNL_PATH, RECONCILE_PATH, useLive } from "../data/api";
+import { deriveARAging, pnlByProductLine, receivableSourceLines } from "../data/reports";
 import { ARAgingWidget } from "./ARAgingWidget";
 import { PnLByProductLine } from "./PnLByProductLine";
 import { ReconciliationTile } from "./ReconciliationTile";
+import { SourceBadge } from "./SourceBadge";
+
+/** Aging is "as of" today: with live data a frozen demo date would age every invoice incorrectly. */
+const AS_OF = new Date().toISOString().slice(0, 10);
 
 /**
- * Managerial dashboard (T-L4-003, gate G4): reconciliation + AR aging + P&L by product line,
- * composed on the same IF-01 fixtures as the ledger screen. Every number comes from
- * `src/data/reports.ts` (fixtures/SQL) — no model produces numbers here (INV-6, CLAUDE.md).
+ * Managerial dashboard (T-L4-003, gate G4): reconciliation + AR aging + P&L by product line, read live
+ * from `GET /api/reconcile`, `GET /api/reports/pnl` and `GET /api/ledger`.
+ *
+ * Every number here comes from SQL in the Worker — no model produces a figure on this screen (INV-6).
+ * AR aging is derived from account-1200 ledger lines, so it appears as soon as the Worker posts
+ * receivables and stays empty until then rather than showing invented invoices.
  */
 export function ManagerialDashboard() {
+  const ledger = useLive(LEDGER_PATH, loadLedger);
+  const reconcile = useLive(RECONCILE_PATH, loadReconcile);
+  const pnl = useLive(PNL_PATH, loadPnl);
+
+  const lines = useMemo(() => ledger.data ?? [], [ledger.data]);
+  const reconcileRows = useMemo(() => reconcile.data ?? [], [reconcile.data]);
+  const pnlRows = useMemo(() => pnl.data ?? [], [pnl.data]);
+
+  const arAging = useMemo(() => deriveARAging(receivableSourceLines(lines), AS_OF), [lines]);
+  const pnlByProduct = useMemo(() => pnlByProductLine(pnlRows), [pnlRows]);
+
+  const loading = ledger.loading || reconcile.loading || pnl.loading;
+  // One badge for three reads: a single degraded source is worth surfacing, so "fixture" wins over "live".
+  const source = loading ? null : [ledger.source, reconcile.source, pnl.source].includes("fixture") ? "fixture" : "live";
+  const error = ledger.error ?? reconcile.error ?? pnl.error;
+
   return (
     <main className="app-main">
       <section className="panel" aria-labelledby="dashboard-heading">
@@ -17,12 +42,12 @@ export function ManagerialDashboard() {
           <h1 className="panel__title" id="dashboard-heading">
             Managerial dashboard
           </h1>
-          <span className="badge badge--fixture">{FIXTURE_SOURCE}</span>
-          <span className="badge badge--live-off">Live Worker API: wired at G2</span>
+          <SourceBadge source={source} loading={loading} error={error} />
         </div>
         <p className="muted">
-          Reconciliation, AR aging and product-line P&amp;L for the owner who does the books on weekends. Widgets
-          read the same IF-01 fixtures as the ledger; the Worker's /api/reconcile and /api/reports/pnl replace them at G2.
+          Reconciliation, AR aging and product-line P&amp;L for the owner who does the books on weekends.
+          Reconciliation and P&amp;L are the Worker's own SQL; AR aging is derived from the receivables the
+          ledger actually carries.
         </p>
 
         <div className="widgets">

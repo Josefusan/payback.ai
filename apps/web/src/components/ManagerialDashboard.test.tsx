@@ -111,24 +111,24 @@ describe("PnLByProductLine", () => {
 });
 
 describe("App navigation (ledger ⇄ managerial dashboard)", () => {
-  it("starts on the ledger and selects the managerial dashboard from the nav", () => {
+  it("starts on the ledger and selects the managerial dashboard from the nav", async () => {
     render(<App />);
 
-    // Ledger is the default screen; the dashboard nav item is a live button, not aria-disabled.
-    expect(screen.getByTestId("pinned-totals")).toBeInTheDocument();
+    // Ledger is the default screen and loads from the Worker; the nav item is a live button, not disabled.
+    expect(await screen.findByTestId("pinned-totals")).toBeInTheDocument();
     const dashboardNav = screen.getByRole("button", { name: "Managerial dashboard" });
     expect(dashboardNav).not.toHaveAttribute("aria-disabled");
 
     fireEvent.click(dashboardNav);
 
-    expect(screen.getByTestId("reconciliation-tile")).toBeInTheDocument();
+    expect(await screen.findByTestId("reconciliation-tile")).toBeInTheDocument();
     expect(screen.getByTestId("ar-aging-widget")).toBeInTheDocument();
     expect(screen.getByTestId("pnl-widget")).toBeInTheDocument();
     expect(screen.queryByTestId("pinned-totals")).not.toBeInTheDocument();
 
     // And back to the ledger — both screens stay usable.
     fireEvent.click(screen.getByRole("button", { name: "Ledger" }));
-    expect(screen.getByTestId("pinned-totals")).toBeInTheDocument();
+    expect(await screen.findByTestId("pinned-totals")).toBeInTheDocument();
   });
 
   it("keeps the other planned screens disabled", () => {

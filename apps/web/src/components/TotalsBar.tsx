@@ -3,11 +3,12 @@ import type { LedgerTotals } from "../data/ledger";
 
 export interface TotalsBarProps {
   totals: LedgerTotals;
-  fixtureSource: string;
+  /** Where the lines came from, shown beside the balance badge. */
+  source: string;
 }
 
 /** Pinned grand totals for the whole ledger view — the ledger equivalent of AG Grid's pinned bottom row. */
-export function TotalsBar({ totals, fixtureSource }: TotalsBarProps) {
+export function TotalsBar({ totals, source }: TotalsBarProps) {
   return (
     <div className="totals" role="group" aria-label="Pinned ledger totals" data-testid="pinned-totals">
       <div className="totals__cell">
@@ -41,7 +42,7 @@ export function TotalsBar({ totals, fixtureSource }: TotalsBarProps) {
         >
           {totals.balanced ? "Journals balanced" : "Out of balance"}
         </span>
-        <span className="muted">{fixtureSource}</span>
+        <span className="muted">{source}</span>
       </div>
     </div>
   );

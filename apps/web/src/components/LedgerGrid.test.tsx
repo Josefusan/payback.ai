@@ -91,11 +91,13 @@ describe("LedgerGrid", () => {
   });
 });
 
-describe("App (ledger screen on fixtures)", () => {
-  it("shows pinned grand totals and a balance badge", () => {
+describe("App (ledger screen)", () => {
+  // The screen reads the Worker API on mount. In jsdom that read fails, so the fixtures stand in —
+  // exactly the degraded path the source badge reports — and every assertion waits for that first paint.
+  it("shows pinned grand totals and a balance badge", async () => {
     render(<App />);
 
-    expect(screen.getByTestId("total-debit")).toHaveTextContent(formatCents(TOTALS.debit_cents));
+    expect(await screen.findByTestId("total-debit")).toHaveTextContent(formatCents(TOTALS.debit_cents));
     expect(screen.getByTestId("total-credit")).toHaveTextContent(formatCents(TOTALS.credit_cents));
     expect(screen.getByTestId("total-net")).toHaveTextContent(formatSignedCents(TOTALS.net_cents));
     expect(screen.getByTestId("balance-badge")).toHaveTextContent("Journals balanced");
@@ -110,7 +112,7 @@ describe("App (ledger screen on fixtures)", () => {
     const drillButtons = await screen.findAllByRole("button", { name: /view source/i });
     fireEvent.click(drillButtons[0]!);
 
-    const drawer = screen.getByTestId("source-drawer");
+    const drawer = await screen.findByTestId("source-drawer");
     expect(within(drawer).getByTestId("source-id")).toHaveTextContent(ledgerEntry.source_id!);
     expect(within(drawer).getByTestId("entry-balance")).toHaveTextContent("Entry balances");
 
