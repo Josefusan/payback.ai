@@ -167,9 +167,10 @@ function normalizeAnswers(raw: unknown): ClefAnswers {
 }
 
 async function runTextModel(env: Env, model: string, user: string): Promise<unknown> {
-  // Workers AI types do not cover every text model here; cast is intentional and isolated.
-  const run = env.AI.run as unknown as (m: string, input: unknown) => Promise<unknown>;
-  const out = await run(model, {
+  // Call the binding as a method on env.AI (never detached): an unbound call throws
+  // "Cannot set properties of undefined (setting '#options')". Cast because the types are incomplete here.
+  const ai = env.AI as unknown as { run(m: string, input: unknown): Promise<unknown> };
+  const out = await ai.run(model, {
     messages: [
       { role: "system", content: FALLBACK_SYSTEM },
       { role: "user", content: user },

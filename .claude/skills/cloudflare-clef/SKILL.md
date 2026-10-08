@@ -7,7 +7,7 @@ description: How to use Cloudflare Clef / Clef-flash decision models (Jev-compat
 
 Sources (verify against the live model page before relying on edge details):
 https://blog.cloudflare.com/clef-decision-models/ · https://developers.cloudflare.com/changelog/post/2026-10-01-clef-workers-ai/ · https://developers.cloudflare.com/workers-ai/models/
-Third-party write-ups used for details below: thejevai.com/blog/how-to-use-cloudflare-clef, developersdigest.tech (Oct 2026). **Day-1 task: record a real response in `docs/clef-response-sample.json` and fix this skill if anything differs.**
+Third-party write-ups used for details below: thejevai.com/blog/how-to-use-cloudflare-clef, developersdigest.tech (Oct 2026). **Day-1 task DONE 2026-10-07: real response recorded in `docs/clef-response-sample.json`; skill updated with the binding caution.**
 
 ## What it is
 - A **decision model**: input = `state` (text/JSON, optional images) + `questions` (typed schema); output = an answer **with probabilities for every allowed option**, in one forward pass. No generated text.
@@ -29,6 +29,8 @@ POST https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run
 Authorization: Bearer $CLOUDFLARE_API_TOKEN      → { success, result: { answers, usage } }
 ```
 Route through **AI Gateway** for logging/caching/analytics (and future RL fine-tuning): pass `{ gateway: { id: env.AI_GATEWAY_ID } }` as the 3rd arg to `env.AI.run` (verify option name in Workers AI docs).
+**Caution:** always call the binding as a method — `env.AI.run(...)`. Detaching it (`const run = env.AI.run; run(...)`) drops its `this` and throws `Cannot set properties of undefined (setting '#options')`, which silently routes every decision to `review` and looks like the model being down. This bit us on 2026-10-07 in both `runClef` (clef.ts) and `runTextModel` (decision-provider.ts).
+**Confirmed shape:** a real request/response is saved in `docs/clef-response-sample.json` (captured 2026-10-07). Note the binding resolves to `result` directly, so read `out.answers` (not `out.result.answers`).
 
 ## Question types
 | type | use | criteria | answer |

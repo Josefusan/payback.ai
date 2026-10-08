@@ -11,7 +11,7 @@
 
   // Ledger database. Create with: npx wrangler d1 create payback  → paste database_id below
   "d1_databases": [
-    { "binding": "DB", "database_name": "payback", "database_id": "REPLACE_WITH_D1_DATABASE_ID", "migrations_dir": "migrations" }
+    { "binding": "DB", "database_name": "payback", "database_id": "d08cd881-ccd8-405e-90b2-0ab615891273", "migrations_dir": "migrations" }
   ],
 
   // Async processing of synced transactions and webhook events

@@ -1,0 +1,41 @@
+{
+  "_note": "Day-1 task from .claude/skills/cloudflare-clef/SKILL.md: a REAL Clef response, captured 2026-10-07 against @cf/cloudflare/clef-flash. Used to pin the request/response shape in apps/worker/src/clef.ts. Synthetic demo data (Pixel & Pine Studio).",
+  "captured_at": "2026-10-07",
+  "transport": "REST POST https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/ai/run/@cf/cloudflare/clef-flash (the Worker binding returns the same `result` object)",
+  "request": {
+    "model": "clef-flash",
+    "state": {
+      "company": { "name": "Pixel & Pine Studio (demo company)", "business": "Two-person design studio ..." },
+      "transaction": { "event_code": "T0006", "amount": "49.00", "currency": "USD", "fee": "-1.92", "counterparty": "buyer@example.com" },
+      "untrusted_customer_text": ""
+    },
+    "questions": {
+      "account": { "type": "choice", "instructions": "Which GL account should the gross amount classify to?", "criteria": { "4000": "Product revenue", "4100": "Services revenue", "review": "Unclear" } },
+      "product_line": { "type": "choice", "instructions": "Which product line?", "criteria": { "templates": "...", "courses": "...", "consulting": "...", "none": "..." } },
+      "needs_review": { "type": "noul", "instructions": "Should a human review this first?" },
+      "risk": { "type": "score", "instructions": "Risk of fraud, dispute or chargeback.", "criteria": ["none", "low", "elevated", "high"] }
+    }
+  },
+  "response": {
+    "result": {
+      "model": "clef-flash",
+      "answers": {
+        "account": { "type": "choice", "choice": "4100", "probabilities": { "1000": 0.0057, "3000": 0.003, "3100": 0.0045, "4000": 0.2864, "4100": 0.6455, "4900": 0.0024, "5000": 0.0103, "6050": 0.0052, "6060": 0.0011, "6100": 0.0052, "6200": 0.0029, "6300": 0.0057, "6900": 0.0062, "review": 0.0159 }, "confidence": 0.4608 },
+        "product_line": { "type": "choice", "choice": "consulting", "probabilities": { "templates": 0.3055, "courses": 0.0747, "consulting": 0.5057, "none": 0.1141 }, "confidence": 0.1569 },
+        "needs_review": { "type": "noul", "noul": 0.0434 },
+        "risk": { "type": "score", "score": 0.7406, "legend": { "0": "none", "1": "low", "2": "elevated", "3": "high" }, "probabilities": { "0": 0.3208, "1": 0.6327, "2": 0.0317, "3": 0.0148 }, "confidence": 0.3392 }
+      },
+      "usage": { "input_tokens": 827, "output_tokens": 0 }
+    },
+    "success": true,
+    "errors": [],
+    "messages": []
+  },
+  "shape_notes": [
+    "The binding (env.AI.run) resolves to `result` directly, so code reads `out.answers`, not `out.result.answers`.",
+    "`needs_review.noul` is a probability of YES (number), not a boolean.",
+    "`risk.score` is the probability-weighted index over the ordered `criteria`; `probabilities`/`legend` are extra and unused by the gate.",
+    "The request body's `model` field must match the URL model: body `clef-flash` with `/clef-flash`, body `clef` with `/clef`. Sending `clef-flash` to the `/clef` endpoint returns 422 \"Unsupported model 'clef-flash'. Use 'clef'\".",
+    "Gotcha that cost an afternoon: detaching the binding (`const run = env.AI.run; run(...)`) throws \"Cannot set properties of undefined (setting '#options')\" and silently routes EVERY decision to review. Always call it as a method on the binding object (`env.AI.run(...)`) so it keeps its `this`."
+  ]
+}

@@ -1,7 +1,7 @@
 /**
  * Cloudflare Clef decision layer. See .claude/skills/cloudflare-clef/SKILL.md
- * Request/response shapes follow Cloudflare's Oct 2026 launch material — confirm against a real response on day 1
- * (save it to docs/clef-response-sample.json) and adjust the types below if needed.
+ * Request/response shapes are confirmed against a real response (docs/clef-response-sample.json, 2026-10-07):
+ * the binding resolves to the model's `result` object, so read `out.answers`.
  *
  * This module owns the decision schema (SCHEMA_VERSION, questions, gating) and the RAW Clef call.
  * Provider selection lives in ./decision-provider; `decideTransaction`/`decideAction` below are the frozen
@@ -138,10 +138,14 @@ export function reviewDecisionFor(threshold: number, model: string, reasons: str
 }
 
 export async function runClef(env: Env, model: string, payload: unknown): Promise<ClefAnswers> {
-  const opts = env.AI_GATEWAY_ID ? { gateway: { id: env.AI_GATEWAY_ID } } : undefined;
-  // The Workers AI types may not know the Clef model id yet; cast is intentional and isolated here.
-  const run = env.AI.run as unknown as (m: string, input: unknown, o?: unknown) => Promise<{ answers?: ClefAnswers }>;
-  const out = await run(model, payload, opts);
+  // Call the binding as a METHOD on env.AI. Detaching it (`const run = env.AI.run; run(...)`) drops the
+  // binding's `this`, and it throws "Cannot set properties of undefined (setting '#options')" — which
+  // routes every decision to review and looks like the model being unavailable. Cast is only because the
+  // Workers AI types do not know the Clef model ids.
+  const ai = env.AI as unknown as { run(m: string, input: unknown, o?: unknown): Promise<{ answers?: ClefAnswers }> };
+  const out = env.AI_GATEWAY_ID
+    ? await ai.run(model, payload, { gateway: { id: env.AI_GATEWAY_ID } })
+    : await ai.run(model, payload);
   return out.answers ?? {};
 }
 
