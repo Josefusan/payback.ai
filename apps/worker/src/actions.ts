@@ -398,13 +398,18 @@ export async function resolveReviewItem(
   if (!item) return null;
 
   let entryId: number | null = null;
-  if (input.status === "approved" && item.kind === "classification") {
-    const posted = await postClassification(env, item.ref_id, input.accountOverride, input.by);
-    if (posted.error) return { resolved: false, error: posted.error, status: posted.status };
-    entryId = posted.entryId ?? null;
-    // Keep the transaction's own state consistent with the ledger it now sits in.
-    await env.DB.prepare(`UPDATE paypal_transactions SET state = 'posted' WHERE transaction_id = ?1`)
-      .bind(item.ref_id).run();
+  if (item.kind === "classification") {
+    if (input.status === "approved") {
+      const posted = await postClassification(env, item.ref_id, input.accountOverride, input.by);
+      if (posted.error) return { resolved: false, error: posted.error, status: posted.status };
+      entryId = posted.entryId ?? null;
+      // Keep the transaction's own state consistent with the ledger it now sits in.
+      await setTransactionState(env, item.ref_id, "posted");
+    } else {
+      // A rejected classification will never reach the ledger, so it has to leave the reconcile pending
+      // bucket (`state IN ('new','decided','review')`) or the tie-out could never come out exact.
+      await setTransactionState(env, item.ref_id, "ignored");
+    }
   }
 
   // Conditional on `status = 'open'`: a concurrent resolve loses the race and reports a 404.
@@ -417,6 +422,12 @@ export async function resolveReviewItem(
 }
 
 interface PostClassificationResult { entryId?: number; error?: string; status?: number }
+
+/** Mirror a human decision onto the transaction row, which is what `reconcile` reads for its pending bucket. */
+async function setTransactionState(env: Env, transactionId: string, state: "posted" | "ignored"): Promise<void> {
+  await env.DB.prepare(`UPDATE paypal_transactions SET state = ?2 WHERE transaction_id = ?1`)
+    .bind(transactionId, state).run();
+}
 
 /** `postEntry` reports an existing entry inside its error text; a replay is a success, not a failure. */
 const ALREADY_POSTED = /already posted as entry (\d+)/;

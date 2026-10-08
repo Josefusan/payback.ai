@@ -559,7 +559,8 @@ describe("review → ledger: approving a classification posts the entry", () => 
 
     expect((await entries()).results).toHaveLength(0);
     expect(await reviewItem()).toMatchObject({ status: "rejected", resolved_by: REVIEWER });
-    expect(await txnState()).toMatchObject({ state: "review" }); // never posted
+    // 'ignored', not left at 'review': reconcile's pending bucket is state IN ('new','decided','review').
+    expect(await txnState()).toMatchObject({ state: "ignored" }); // never posted
   });
 
   it("resolves cleanly when the autonomous path already posted the transaction", async () => {
@@ -574,5 +575,26 @@ describe("review → ledger: approving a classification posts the entry", () => 
 
     expect((await entries()).results).toHaveLength(1); // the guard prevented a double post
     expect(await reviewItem()).toMatchObject({ status: "approved" });
+  });
+
+  it("posts an event family the map reserves for a human (T19xx account correction)", async () => {
+    // The event map sends T19xx to a person rather than to a template, so `buildJournal` refuses it on the
+    // autonomous path — the reviewer's account is what builds the entry. Without this the approval dead-ends.
+    db.exec(`INSERT INTO paypal_transactions (transaction_id, event_code, status, initiated_at, amount_cents, fee_cents, currency, subject, raw_json, state)
+             VALUES ('TX-19','T1900','S','2026-10-06T17:06:06Z',500000,0,'USD','Initial balance','{}','review')`);
+    db.exec(`INSERT INTO decisions (transaction_id, model, schema_version, account_choice, account_prob, product_line, needs_review_prob, risk_score, answers_json, threshold, gate, gate_reasons)
+             VALUES ('TX-19','test','txn-v1','3000',0.43,'none',0.48,0.87,'{}',0.9,'review','["low_confidence:0.432<0.9"]')`);
+    db.exec(`INSERT INTO review_queue (kind, ref_id, reasons, payload_json) VALUES ('classification','TX-19','["low_confidence:0.432<0.9"]','{}')`);
+
+    const res = await post("/api/review/1/resolve", { status: "approved", by: REVIEWER });
+    expect(res.status).toBe(200);
+
+    // Dr 5000 PayPal Clearing / Cr 3000 Owner's equity — the account being funded.
+    expect((await lines()).results).toEqual([
+      { account_code: "1010", debit_cents: 500000, credit_cents: 0 },
+      { account_code: "3000", debit_cents: 0, credit_cents: 500000 },
+    ]);
+    const txn = await db.prepare(`SELECT state FROM paypal_transactions WHERE transaction_id = 'TX-19'`).first<{ state: string }>();
+    expect(txn).toMatchObject({ state: "posted" });
   });
 });

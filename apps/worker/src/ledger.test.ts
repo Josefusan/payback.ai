@@ -59,6 +59,17 @@ describe("buildJournal", () => {
     expect(() => buildJournal({ eventCode: "T1900", amountCents: 100, feeCents: 0, currency: "USD" }, "6900")).toThrow(UnsupportedEventError);
   });
 
+  it("books a human-reserved family only when the reviewer is deciding (T19xx, IF-07)", () => {
+    const t = { eventCode: "T1900", amountCents: 500_000, feeCents: 0, currency: "USD" };
+    // The event map sends T19xx to a person, so the autonomous path must never book it itself.
+    expect(() => buildJournal(t, "3000")).toThrow(UnsupportedEventError);
+
+    const lines = buildJournal(t, "3000", undefined, { humanDirected: true });
+    expect(sum(lines)).toBe(0);
+    expect(lines).toContainEqual(expect.objectContaining({ account: "1010", debit: 500_000 }));
+    expect(lines).toContainEqual(expect.objectContaining({ account: "3000", credit: 500_000 }));
+  });
+
   it("detects unbalanced entries", () => {
     expect(() => assertBalanced([{ account: "1010", debit: 100, credit: 0, currency: "USD" }])).toThrow(/Unbalanced/);
   });

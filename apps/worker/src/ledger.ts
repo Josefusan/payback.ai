@@ -28,6 +28,17 @@ export interface TxnForPosting {
 
 export class UnsupportedEventError extends Error {}
 
+export interface BuildJournalOptions {
+  /**
+   * The reviewer is deciding this entry (IF-07). The event map sends some families to a person rather than
+   * to a template — T19xx account corrections, T20xx intra-account transfers, T22xx/T23xx tax withholding —
+   * so the reviewer's account builds a signed PayPal entry instead of the code being booked blindly.
+   * `postEntry` is the only caller that sets this; the autonomous path leaves it unset, so nothing the map
+   * reserves for a human can ever post itself.
+   */
+  humanDirected?: boolean;
+}
+
 const PAYPAL = "1010";
 const BANK = "1000";
 const FEES = "6050";
@@ -39,7 +50,7 @@ const cr = (account: string, cents: number, t: TxnForPosting, pl?: string): Jour
 /**
  * Build lines for a transaction. `account` is the Clef-chosen P&L/equity account (ignored for pure transfers/holds).
  */
-export function buildJournal(t: TxnForPosting, account: string, productLine?: string): JournalLine[] {
+export function buildJournal(t: TxnForPosting, account: string, productLine?: string, options: BuildJournalOptions = {}): JournalLine[] {
   const family = t.eventCode.slice(0, 3); // "T00", "T01", ...
   const gross = Math.abs(t.amountCents);
   const fee = Math.abs(t.feeCents);
@@ -82,7 +93,15 @@ export function buildJournal(t: TxnForPosting, account: string, productLine?: st
       lines = t.amountCents < 0 ? [dr(RESERVE, gross, t), cr(PAYPAL, gross, t)] : [dr(PAYPAL, gross, t), cr(RESERVE, gross, t)];
       break;
     default:
-      throw new UnsupportedEventError(`No journal template for ${t.eventCode}; route to review`);
+      if (!options.humanDirected) {
+        throw new UnsupportedEventError(`No journal template for ${t.eventCode}; route to review`);
+      }
+      // Human-directed entry: the reviewer's account carries the counterparty side and the sign of the
+      // transaction picks the template shape (money in → Cr their account, money out → Dr their account).
+      lines = t.amountCents >= 0
+        ? [dr(PAYPAL, gross - fee, t), ...(fee ? [dr(FEES, fee, t, productLine)] : []), cr(account, gross, t, productLine)]
+        : [dr(account, gross, t, productLine), cr(PAYPAL, gross, t)];
+      break;
   }
   assertBalanced(lines);
   return lines.filter((l) => l.debit > 0 || l.credit > 0);
@@ -200,6 +219,7 @@ export async function postEntry(env: Env, input: PostEntryInput): Promise<Posted
     },
     account,
     decision.product_line ?? undefined,
+    { humanDirected: true },
   );
 
   const entryDate = txn.initiated_at.slice(0, 10);
