@@ -36,18 +36,30 @@ review.post("/api/review/:id/resolve", async (c) => {
   const id = parseId(c.req.param("id"));
   if (id === null) return c.json({ error: "invalid_id" }, 400);
 
-  const parsed = await readJson<{ status?: unknown; by?: unknown }>(c);
+  const parsed = await readJson<{ status?: unknown; by?: unknown; account_override?: unknown }>(c);
   if (!parsed.ok) return c.json({ error: "invalid_json" }, 400);
-  const { status, by } = parsed.body;
+  const { status, by, account_override: accountOverride } = parsed.body;
   if (status !== "approved" && status !== "rejected") {
     return c.json({ error: "invalid_status", allowed: ["approved", "rejected"] }, 400);
   }
   if (typeof by !== "string" || by.trim() === "") return c.json({ error: "resolver_required" }, 400);
+  if (accountOverride !== undefined && (typeof accountOverride !== "string" || accountOverride.trim() === "")) {
+    return c.json({ error: "invalid_account_override" }, 400);
+  }
 
-  const resolved = await resolveReviewItem(c.env, id, { status, by });
+  // Approving a classification posts the entry via ledger.postEntry (the journal's only writer): the
+  // reviewer becomes the entry's approver and `account_override` is their correction to Clef's choice.
+  const outcome = await resolveReviewItem(c.env, id, {
+    status,
+    by,
+    accountOverride: typeof accountOverride === "string" ? accountOverride.trim() : undefined,
+  });
   // Propagate the domain result: an unknown id or an already-resolved item is a 404, not a silent ok.
-  if (!resolved) return c.json({ error: "not_found_or_already_resolved" }, 404);
-  // TODO(agentic-workflow-engineer): on approval, post the human-chosen account / execute the approved action with audit row.
+  if (!outcome) return c.json({ error: "not_found_or_already_resolved" }, 404);
+  // A posting failure leaves the item OPEN for a retry — the caller must not read it as resolved.
+  if (!outcome.resolved) {
+    return c.json({ error: "posting_failed", detail: outcome.error }, (outcome.status ?? 409) as 400 | 409);
+  }
   const body: ReviewResolveResponse = { ok: true };
   return c.json(body);
 });

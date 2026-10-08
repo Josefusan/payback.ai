@@ -9,6 +9,15 @@ const SANDBOX_BASE = "https://api-m.sandbox.paypal.com";
 /** Transaction Search (`/v1/reporting/transactions`) rejects windows longer than 31 days. */
 export const MAX_SEARCH_RANGE_MS = 31 * 24 * 60 * 60 * 1000;
 
+/**
+ * OAuth scope required by Transaction Search. PayPal grants this only when the app's "Transaction search"
+ * feature is enabled — and, critically, an ALREADY-ISSUED token never gains a scope added afterwards.
+ */
+export const REPORTING_SEARCH_SCOPE = "https://uri.paypal.com/services/reporting/search/read";
+
+/** Refresh the cached token this long before it actually expires (PayPal client_credentials tokens live ~9h). */
+const EXPIRY_SKEW_MS = 5 * 60_000;
+
 /** PayPal returns JSON on success; error pages can be HTML/text — never let JSON.parse mask a PayPalError. */
 function parseJson(text: string): unknown {
   if (!text) return {};
@@ -28,6 +37,50 @@ function assertSearchRange(startISO: string, endISO: string): void {
   if (end - start > MAX_SEARCH_RANGE_MS) {
     throw new RangeError(`Transaction Search range must be <= 31 days (got ${((end - start) / 86_400_000).toFixed(1)})`);
   }
+}
+
+/** OAuth `scope` is a single space-delimited string; split it for the capability helpers. */
+function parseScopes(scope: string | undefined): string[] {
+  return (scope ?? "").split(/\s+/).filter(Boolean);
+}
+
+/** Best-effort read of PayPal's `debug_id` without assuming the body is an object. */
+function debugIdOf(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const id = (body as { debug_id?: unknown }).debug_id;
+  return typeof id === "string" ? id : undefined;
+}
+
+/** Heuristic: does an error body look like a missing permission/scope (vs. a hard authentication failure)? */
+function looksLikeScopeError(body: unknown): boolean {
+  if (typeof body !== "object" || body === null) return false;
+  const b = body as { name?: unknown; message?: unknown; details?: unknown };
+  const parts: string[] = [];
+  if (typeof b.name === "string") parts.push(b.name);
+  if (typeof b.message === "string") parts.push(b.message);
+  if (Array.isArray(b.details)) {
+    for (const d of b.details) {
+      if (typeof d === "object" && d !== null) {
+        const det = d as { issue?: unknown; description?: unknown };
+        if (typeof det.issue === "string") parts.push(det.issue);
+        if (typeof det.description === "string") parts.push(det.description);
+      }
+    }
+  }
+  return /not_?authorized|insufficient|permission|scope|forbidden/i.test(parts.join(" "));
+}
+
+/** Map a request path to the scope a 403 most plausibly is missing, so the error can name it. */
+const SCOPE_HINTS: ReadonlyArray<{ match: RegExp; scope: string }> = [
+  { match: /\/v1\/reporting\/transactions/, scope: REPORTING_SEARCH_SCOPE },
+  { match: /\/v1\/reporting\/balances/, scope: "https://uri.paypal.com/services/reporting/balances/read" },
+  { match: /\/v1\/customer\/disputes/, scope: "https://uri.paypal.com/services/disputes/read" },
+  { match: /\/v2\/invoicing/, scope: "https://uri.paypal.com/services/invoicing" },
+  { match: /\/v1\/payments\/payouts/, scope: "https://uri.paypal.com/services/payments/payouts" },
+];
+
+function likelyMissingScope(path: string): string {
+  return SCOPE_HINTS.find((h) => h.match.test(path))?.scope ?? REPORTING_SEARCH_SCOPE;
 }
 
 export interface Money { currency_code: string; value: string }
@@ -60,14 +113,47 @@ export class PayPalError extends Error {
   }
 }
 
+/**
+ * Thrown when an API call is STILL 403 after the client already revoked the cached token and retried with a
+ * freshly minted one. Because PayPal pins a client_credentials token to the scopes present when it was
+ * created, a 403 that survives a revoke + refresh means the app itself lacks the scope/feature — an operator
+ * must enable it in the developer dashboard. It is an app-configuration fault, not a transient one.
+ */
+export class PayPalScopeError extends PayPalError {
+  constructor(
+    status: number,
+    debugId: string | undefined,
+    body: unknown,
+    public readonly path: string,
+    public readonly missingScope: string,
+  ) {
+    super(status, debugId, body);
+    this.name = "PayPalScopeError";
+    const hinted = looksLikeScopeError(body) ? "The error body reports insufficient permissions. " : "";
+    this.message =
+      `${hinted}PayPal ${status} on ${path} persisted after a token revoke + refresh ` +
+      `(POST /v1/oauth2/token/terminate, then a freshly minted client_credentials token). ` +
+      `That makes this an app-scope problem, not a transient one: the app is most likely missing the ` +
+      `"${missingScope}" scope — enable the matching feature in the PayPal developer dashboard, then retry.`;
+  }
+}
+
 type FetchLike = typeof fetch;
 
+/** Cached token plus the scopes PayPal granted on it, so capability checks stay off the network. */
+interface TokenCache { token: string; expiresAt: number; scopes: string[] }
+
 // Module-scoped so a warm isolate reuses the ~9h token across requests; `resetTokenCache()` keeps tests isolated.
-let cachedToken: { token: string; expiresAt: number } | null = null;
+let cachedToken: TokenCache | null = null;
 
 /** Test hook: drop the cached access token so the next call does a fresh OAuth round-trip. */
 export function resetTokenCache(): void {
   cachedToken = null;
+}
+
+/** Test hook: snapshot the cached token/scopes without forcing an OAuth round-trip. */
+export function peekTokenCache(): { token: string; scopes: string[] } | null {
+  return cachedToken ? { token: cachedToken.token, scopes: [...cachedToken.scopes] } : null;
 }
 
 export class PayPalClient {
@@ -84,35 +170,112 @@ export class PayPalClient {
     this.fetchImpl = opts.fetch ?? fetch.bind(globalThis);
   }
 
-  private async token(): Promise<string> {
-    if (cachedToken && Date.now() < cachedToken.expiresAt - 5 * 60_000) return cachedToken.token;
+  private basicAuth(): string {
+    return `Basic ${btoa(`${this.env.PAYPAL_CLIENT_ID}:${this.env.PAYPAL_CLIENT_SECRET}`)}`;
+  }
+
+  /** Mint a fresh client_credentials token and (re)populate the module cache. Does not read the cache. */
+  private async fetchToken(): Promise<TokenCache> {
     const res = await this.fetchImpl(`${this.base}/v1/oauth2/token`, {
       method: "POST",
       headers: {
-        Authorization: `Basic ${btoa(`${this.env.PAYPAL_CLIENT_ID}:${this.env.PAYPAL_CLIENT_SECRET}`)}`,
+        Authorization: this.basicAuth(),
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: "grant_type=client_credentials",
     });
     if (!res.ok) throw new PayPalError(res.status, res.headers.get("paypal-debug-id") ?? undefined, await res.text());
-    const data = (await res.json()) as { access_token: string; expires_in: number };
-    cachedToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
-    return data.access_token;
+    const data = (await res.json()) as { access_token: string; expires_in: number; scope?: string };
+    const entry: TokenCache = {
+      token: data.access_token,
+      expiresAt: Date.now() + data.expires_in * 1000,
+      scopes: parseScopes(data.scope),
+    };
+    cachedToken = entry;
+    return entry;
   }
 
-  async request<T>(method: string, path: string, opts: { body?: unknown; requestId?: string; query?: Record<string, string> } = {}): Promise<T> {
+  private async token(): Promise<string> {
+    if (cachedToken && Date.now() < cachedToken.expiresAt - EXPIRY_SKEW_MS) return cachedToken.token;
+    return (await this.fetchToken()).token;
+  }
+
+  /**
+   * Scopes granted on the current access token (from the cache when warm, else a fresh OAuth round-trip).
+   * Health checks / sync guards can assert capability with this before touching a report endpoint.
+   */
+  async getTokenScopes(): Promise<string[]> {
+    if (cachedToken && Date.now() < cachedToken.expiresAt - EXPIRY_SKEW_MS) return [...cachedToken.scopes];
+    return [...(await this.fetchToken()).scopes];
+  }
+
+  /** True when the current token carries `scope` — assert capability before syncing. */
+  async hasScope(scope: string): Promise<boolean> {
+    return (await this.getTokenScopes()).includes(scope);
+  }
+
+  /**
+   * Revoke the current access token and drop the module cache so the next `token()` mints a fresh one:
+   * POST /v1/oauth2/token/terminate with Basic auth and a form-encoded `token=<current>` body.
+   * Best-effort — a failed revoke must not mask the API error we are recovering from — but we always
+   * clear the cache, so the caller's retry uses a brand-new token.
+   */
+  private async terminateToken(token: string): Promise<void> {
+    try {
+      await this.fetchImpl(`${this.base}/v1/oauth2/token/terminate`, {
+        method: "POST",
+        headers: {
+          Authorization: this.basicAuth(),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `token=${encodeURIComponent(token)}`,
+      });
+    } catch {
+      /* best-effort: fall through and still clear the cache */
+    } finally {
+      cachedToken = null;
+    }
+  }
+
+  /** One wire attempt. Returns the raw response, its parsed body and the bearer token that was used. */
+  private async send(
+    method: string,
+    path: string,
+    opts: { body?: unknown; requestId?: string; query?: Record<string, string> },
+  ): Promise<{ res: Response; json: unknown; token: string }> {
     const url = new URL(path, this.base);
     for (const [k, v] of Object.entries(opts.query ?? {})) url.searchParams.set(k, v);
+    const token = await this.token();
     const headers: Record<string, string> = {
-      Authorization: `Bearer ${await this.token()}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       Prefer: "return=representation",
     };
     if (opts.requestId) headers["PayPal-Request-Id"] = opts.requestId;
     const res = await this.fetchImpl(url, { method, headers, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) });
     const json = parseJson(await res.text());
-    if (!res.ok) throw new PayPalError(res.status, (json as { debug_id?: string }).debug_id, json);
-    return json as T;
+    return { res, json, token };
+  }
+
+  async request<T>(method: string, path: string, opts: { body?: unknown; requestId?: string; query?: Record<string, string> } = {}): Promise<T> {
+    const first = await this.send(method, path, opts);
+    if (first.res.ok) return first.json as T;
+
+    // Scope staleness: PayPal caches client_credentials tokens for ~9h, so a scope granted AFTER the token
+    // was minted (e.g. enabling "Transaction search") is absent from it — re-running OAuth returns the SAME
+    // token and every report call 403s as NOT_AUTHORIZED / insufficient permissions. Revoke the cached token,
+    // mint a fresh one, and retry the original request EXACTLY ONCE.
+    if (first.res.status === 403) {
+      await this.terminateToken(first.token);
+      const second = await this.send(method, path, opts);
+      if (second.res.ok) return second.json as T;
+      if (second.res.status === 403) {
+        throw new PayPalScopeError(second.res.status, debugIdOf(second.json), second.json, path, likelyMissingScope(path));
+      }
+      throw new PayPalError(second.res.status, debugIdOf(second.json), second.json);
+    }
+
+    throw new PayPalError(first.res.status, debugIdOf(first.json), first.json);
   }
 
   // ── Reporting ────────────────────────────────────────────────────────────

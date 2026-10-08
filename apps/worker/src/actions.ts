@@ -32,6 +32,7 @@
 import type { ActionOutcome, ActionRow, ReviewItem } from "../../../packages/contracts/api";
 import { decideAction } from "./clef";
 import type { Env } from "./env";
+import { postEntry } from "./ledger";
 import { fromCents } from "./money";
 import { PayPalClient } from "./paypal";
 import { evaluateAction, idempotencyKey, policyConfig, type ActionProposal, type PolicyResult } from "./policy";
@@ -363,17 +364,85 @@ export async function listOpenReviewItems(env: Env): Promise<ReviewItem[]> {
   return results;
 }
 
-/** Resolve one open review item. Returns false when it was already resolved (or does not exist). */
+/** Why an approval did or did not reach the ledger. */
+export interface ReviewResolveOutcome {
+  resolved: boolean;
+  /** `journal_entries.id` written by this approval (classification items only). */
+  entryId?: number | null;
+  /** Set when the item was left open. */
+  error?: string;
+  /** Status to report: 400 for a bad override, 409 when the ledger refuses the posting. */
+  status?: number;
+}
+
+/**
+ * Resolve one open review item. Returns null when it was already resolved (or does not exist).
+ *
+ * Approving a **classification** item closes the loop `processTransaction` opened: the entry is posted
+ * through `postEntry` (the only writer of the journal) with the reviewer recorded as `approver`, which is
+ * key #2 of INV-4 — a named human stands behind every contested entry. `accountOverride` is the human
+ * correction; without it the Clef decision's choice is used. `kind: 'action'` and `'reconciliation'` items
+ * move no journal lines and are simply closed.
+ *
+ * The item is marked resolved only AFTER the ledger write succeeds, so a posting failure leaves it open to
+ * retry instead of dropping a transaction on the floor. Replays are safe: when the transaction is already
+ * posted (including by the autonomous path), `postEntry`'s guard is treated as success.
+ */
 export async function resolveReviewItem(
   env: Env,
   id: number,
-  input: { status: "approved" | "rejected"; by: string },
-): Promise<boolean> {
+  input: { status: "approved" | "rejected"; by: string; accountOverride?: string },
+): Promise<ReviewResolveOutcome | null> {
+  const item = await env.DB.prepare(`SELECT * FROM review_queue WHERE id = ?1 AND status = 'open'`)
+    .bind(id).first<ReviewItem>();
+  if (!item) return null;
+
+  let entryId: number | null = null;
+  if (input.status === "approved" && item.kind === "classification") {
+    const posted = await postClassification(env, item.ref_id, input.accountOverride, input.by);
+    if (posted.error) return { resolved: false, error: posted.error, status: posted.status };
+    entryId = posted.entryId ?? null;
+    // Keep the transaction's own state consistent with the ledger it now sits in.
+    await env.DB.prepare(`UPDATE paypal_transactions SET state = 'posted' WHERE transaction_id = ?1`)
+      .bind(item.ref_id).run();
+  }
+
+  // Conditional on `status = 'open'`: a concurrent resolve loses the race and reports a 404.
   const res = await env.DB.prepare(
     `UPDATE review_queue SET status = ?1, resolved_by = ?2, resolved_at = datetime('now')
       WHERE id = ?3 AND status = 'open'`,
   ).bind(input.status, input.by, id).run();
-  return res.meta.changes > 0;
+  if (res.meta.changes === 0) return null;
+  return { resolved: true, entryId };
+}
+
+interface PostClassificationResult { entryId?: number; error?: string; status?: number }
+
+/** `postEntry` reports an existing entry inside its error text; a replay is a success, not a failure. */
+const ALREADY_POSTED = /already posted as entry (\d+)/;
+
+/** Post the human-approved classification for one stored transaction. */
+async function postClassification(
+  env: Env,
+  transactionId: string,
+  accountOverride: string | undefined,
+  approver: string,
+): Promise<PostClassificationResult> {
+  const decision = await env.DB.prepare(
+    `SELECT id FROM decisions WHERE transaction_id = ?1 ORDER BY id DESC LIMIT 1`,
+  ).bind(transactionId).first<{ id: number }>();
+  if (!decision) return { error: `no decision recorded for transaction ${transactionId}`, status: 409 };
+
+  try {
+    const posted = await postEntry(env, { transactionId, accountOverride, decisionId: decision.id, approver });
+    return { entryId: posted.entryId };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const replay = ALREADY_POSTED.exec(message);
+    if (replay) return { entryId: Number(replay[1]) };
+    // A bad override is the caller's fault (400); everything else is the ledger refusing (409).
+    return { error: message, status: message.startsWith("Unknown account") ? 400 : 409 };
+  }
 }
 
 /* ────────────────────────────────────────────────────── webhook events */

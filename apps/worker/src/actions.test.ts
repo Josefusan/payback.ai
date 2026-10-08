@@ -462,3 +462,117 @@ describe("auth — shared admin token guards mutating routes (G3)", () => {
     expect((await res.json()) as { error: string }).toEqual({ error: "auth_not_configured" });
   });
 });
+
+/**
+ * T-L3-002 / INV-4 — approving a review item is what actually closes the loop `processTransaction`
+ * opened. The human is key #2: their identity lands on the entry as `approver`, and `account_override`
+ * is their correction to Clef's choice. `postEntry` (the journal's only writer) does the posting, so
+ * these tests read the real rows back out of the migrated schema.
+ */
+describe("review → ledger: approving a classification posts the entry", () => {
+  const REVIEWER = "controller@payback.ai";
+  const withToken = { "x-admin-token": ADMIN };
+  const post = (path: string, body: unknown, headers: Record<string, string> = withToken) =>
+    new Hono<AppEnv>()
+      .route("/", reviewRoutes)
+      .request(path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) }, env);
+
+  /** The stored transaction, low-confidence decision and open review item the pipeline would have left. */
+  function seedReview(accountChoice = "4000") {
+    db.exec(`INSERT INTO paypal_transactions (transaction_id, event_code, status, initiated_at, amount_cents, fee_cents, currency, counterparty, subject, raw_json, state)
+             VALUES ('TX-1','T0006','S','2026-10-06T09:30:00Z',4900,-192,'USD','Acme Studio','Template pack','{}','review')`);
+    db.exec(`INSERT INTO decisions (transaction_id, model, schema_version, account_choice, account_prob, product_line, needs_review_prob, risk_score, answers_json, threshold, gate, gate_reasons)
+             VALUES ('TX-1','test','txn-v1','${accountChoice}',0.42,'templates',0.48,0.3,'{}',0.9,'review','["low_confidence:0.420<0.9"]')`);
+    db.exec(`INSERT INTO review_queue (kind, ref_id, reasons, payload_json) VALUES ('classification','TX-1','["low_confidence:0.420<0.9"]','{}')`);
+  }
+
+  const entries = () => db.prepare(`SELECT source, source_id, decision_id, approver, entry_date FROM journal_entries ORDER BY id`).all<{
+    source: string; source_id: string | null; decision_id: number | null; approver: string | null; entry_date: string;
+  }>();
+  const lines = () => db.prepare(`SELECT account_code, debit_cents, credit_cents FROM journal_lines ORDER BY account_code`).all<{
+    account_code: string; debit_cents: number; credit_cents: number;
+  }>();
+  const reviewItem = (id = 1) => db.prepare(`SELECT status, resolved_by FROM review_queue WHERE id = ?1`).bind(id).first<{
+    status: string; resolved_by: string | null;
+  }>();
+  const txnState = () => db.prepare(`SELECT state FROM paypal_transactions WHERE transaction_id = 'TX-1'`).first<{ state: string }>();
+
+  it("posts a balanced 'manual' entry, records the reviewer as approver, and marks the transaction posted", async () => {
+    seedReview();
+
+    const res = await post("/api/review/1/resolve", { status: "approved", by: REVIEWER });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+
+    // Dr 4708 PayPal (4900 gross − 192 fee) + Dr 192 fees = Cr 4900 revenue — Clef's chosen account.
+    expect((await lines()).results).toEqual([
+      { account_code: "1010", debit_cents: 4708, credit_cents: 0 },
+      { account_code: "4000", debit_cents: 0, credit_cents: 4900 },
+      { account_code: "6050", debit_cents: 192, credit_cents: 0 },
+    ]);
+    expect((await entries()).results).toEqual([
+      { source: "manual", source_id: "TX-1", decision_id: 1, approver: REVIEWER, entry_date: "2026-10-06" },
+    ]);
+    expect(await txnState()).toMatchObject({ state: "posted" });
+    expect(await reviewItem()).toMatchObject({ status: "approved", resolved_by: REVIEWER });
+  });
+
+  it("uses account_override as the human's correction to Clef's choice", async () => {
+    seedReview("4000");
+
+    const res = await post("/api/review/1/resolve", { status: "approved", by: REVIEWER, account_override: "4100" });
+    expect(res.status).toBe(200);
+
+    // Same amounts, human-chosen account: services revenue instead of product revenue.
+    expect((await lines()).results).toEqual([
+      { account_code: "1010", debit_cents: 4708, credit_cents: 0 },
+      { account_code: "4100", debit_cents: 0, credit_cents: 4900 },
+      { account_code: "6050", debit_cents: 192, credit_cents: 0 },
+    ]);
+  });
+
+  it("an unknown account_override is a 400 and leaves the item open for a retry", async () => {
+    seedReview();
+
+    const res = await post("/api/review/1/resolve", { status: "approved", by: REVIEWER, account_override: "9999" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "posting_failed" });
+
+    expect((await entries()).results).toHaveLength(0); // nothing was written
+    expect(await reviewItem()).toMatchObject({ status: "open" }); // still actionable
+  });
+
+  it("an empty account_override is rejected before any work happens", async () => {
+    seedReview();
+
+    const res = await post("/api/review/1/resolve", { status: "approved", by: REVIEWER, account_override: "   " });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "invalid_account_override" });
+    expect((await entries()).results).toHaveLength(0);
+  });
+
+  it("rejecting closes the item without touching the ledger", async () => {
+    seedReview();
+
+    const res = await post("/api/review/1/resolve", { status: "rejected", by: REVIEWER });
+    expect(res.status).toBe(200);
+
+    expect((await entries()).results).toHaveLength(0);
+    expect(await reviewItem()).toMatchObject({ status: "rejected", resolved_by: REVIEWER });
+    expect(await txnState()).toMatchObject({ state: "review" }); // never posted
+  });
+
+  it("resolves cleanly when the autonomous path already posted the transaction", async () => {
+    seedReview();
+    db.exec(`INSERT INTO journal_entries (source, source_id, entry_date, memo, decision_id)
+             VALUES ('paypal','TX-1','2026-10-06','Template pack',1)`);
+    db.exec(`INSERT INTO journal_lines (entry_id, account_code, debit_cents, credit_cents, currency)
+             VALUES (1,'1010',4708,0,'USD'),(1,'4000',0,4900,'USD'),(1,'6050',192,0,'USD')`);
+
+    const res = await post("/api/review/1/resolve", { status: "approved", by: REVIEWER });
+    expect(res.status).toBe(200);
+
+    expect((await entries()).results).toHaveLength(1); // the guard prevented a double post
+    expect(await reviewItem()).toMatchObject({ status: "approved" });
+  });
+});
