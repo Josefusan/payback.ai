@@ -78,7 +78,10 @@ export class PayPalClient {
     if (env.PAYPAL_ENV !== "sandbox") {
       throw new Error("PAYPAL_ENV must be 'sandbox' — live PayPal is forbidden in this project (hackathon rules + safety).");
     }
-    this.fetchImpl = opts.fetch ?? fetch;
+    // Bind the global `fetch`: the call sites use `this.fetchImpl(...)`, which would otherwise pass the
+    // client as the receiver and the Workers runtime rejects it with "Illegal invocation". Injected
+    // implementations (tests) are used as given.
+    this.fetchImpl = opts.fetch ?? fetch.bind(globalThis);
   }
 
   private async token(): Promise<string> {
