@@ -6,6 +6,7 @@ import { PayPalClient, type PayPalTransactionDetail } from "./paypal";
 import { decideTransaction, type TxnForDecision } from "./clef";
 import { buildJournal, buildOpeningLines, UnsupportedEventError } from "./ledger";
 import { fromCents, toCents } from "./money";
+import { auditInsert, buildAuditRow, readTail } from "./audit";
 
 export function toDecisionInput(d: PayPalTransactionDetail): TxnForDecision {
   const t = d.transaction_info;
@@ -100,9 +101,30 @@ export async function processTransaction(env: Env, transactionId: string): Promi
        VALUES ((SELECT id FROM journal_entries WHERE source = 'paypal' AND source_id = ?1), ?2, ?3, ?4, ?5, ?6, ?7)`,
     ).bind(transactionId, l.account, l.debit, l.credit, l.currency, l.productLine ?? null, l.counterparty ?? null),
   );
+  // The audit row rides in the SAME batch as the entry: a posting that exists without its audit row
+  // would be an unauditable change to the books, so the two succeed or fail together.
+  const auditRow = await buildAuditRow(
+    {
+      ref_type: "journal_entry",
+      ref_id: transactionId,
+      event: "posted",
+      actor: "agent",
+      detail: {
+        account: decision.account.choice,
+        product_line: decision.productLine.choice,
+        account_prob: decision.account.probabilities[decision.account.choice] ?? null,
+        model: decision.model,
+        schema_version: decision.schemaVersion,
+        threshold: decision.threshold,
+        lines: lines.length,
+      },
+    },
+    await readTail(env),
+  );
   await env.DB.batch([
     entryStmt, ...lineStmts,
     env.DB.prepare(`UPDATE paypal_transactions SET state = 'posted' WHERE transaction_id = ?1`).bind(transactionId),
+    auditInsert(env, auditRow),
   ]);
   return "posted";
 }
@@ -190,6 +212,19 @@ export async function ensureOpeningBalance(env: Env, cutoffISO: string): Promise
       ),
       // Same transaction as the entry: the cutoff and the currency it was opened for appear together.
       env.DB.prepare(`INSERT OR IGNORE INTO sync_state (key, value) VALUES ('sync_currency', ?1)`).bind(primary.currency),
+      auditInsert(
+        env,
+        await buildAuditRow(
+          {
+            ref_type: "journal_entry",
+            ref_id: pinISO,
+            event: "opened",
+            actor: "system",
+            detail: { currency: primary.currency, balance_cents: balanceCents, lines: lines.length },
+          },
+          await readTail(env),
+        ),
+      ),
     ]);
   } catch (error) {
     // Compensate: release the claim so the next sync can post the opening entry instead of short-circuiting.

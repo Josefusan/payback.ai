@@ -8,6 +8,7 @@
  */
 import type { Env } from "./env";
 import { accountExists } from "./coa";
+import { auditInsert, buildAuditRow, readTail } from "./audit";
 
 export interface JournalLine {
   account: string;
@@ -232,6 +233,26 @@ export async function postEntry(env: Env, input: PostEntryInput): Promise<Posted
     ...lines.map((l) =>
       env.DB.prepare(INSERT_LINE).bind("manual", transactionId, l.account, l.debit, l.credit, l.currency, l.productLine ?? null, l.counterparty ?? null),
     ),
+    // Same batch as the entry: the reviewer's correction and the record of who made it are one write.
+    auditInsert(
+      env,
+      await buildAuditRow(
+        {
+          ref_type: "journal_entry",
+          ref_id: transactionId,
+          event: "posted",
+          actor: approver,
+          detail: {
+            account,
+            account_override: accountOverride ?? null,
+            decision_id: decisionId,
+            lines: lines.length,
+            human: true,
+          },
+        },
+        await readTail(env),
+      ),
+    ),
   ]);
 
   const row = await env.DB.prepare(
@@ -283,6 +304,20 @@ export async function reverseEntry(env: Env, entryId: number, input: ReverseEntr
     ).bind(prior.source_id, entryDate, memo, prior.decision_id, entryId, approver),
     ...mirrored.map((l) =>
       env.DB.prepare(INSERT_REVERSAL_LINE).bind(entryId, l.account, l.debit, l.credit, l.currency, l.productLine ?? null, l.counterparty ?? null),
+    ),
+    // Same batch as the reversal: the correction to the books and its audit row are one write.
+    auditInsert(
+      env,
+      await buildAuditRow(
+        {
+          ref_type: "journal_entry",
+          ref_id: String(entryId),
+          event: "reversed",
+          actor: approver,
+          detail: { memo, lines: mirrored.length },
+        },
+        await readTail(env),
+      ),
     ),
   ]);
 

@@ -34,6 +34,7 @@ import { decideAction } from "./clef";
 import type { Env } from "./env";
 import { postEntry } from "./ledger";
 import { fromCents } from "./money";
+import { appendAuditQuietly } from "./audit";
 import { PayPalClient } from "./paypal";
 import { evaluateAction, idempotencyKey, policyConfig, type ActionProposal, type PolicyResult } from "./policy";
 
@@ -141,10 +142,18 @@ export async function executeProposal(
       const pin = claimed.error ?? "";
       const paypalRef = await callPayPal(env, proposal, key);
       const done = await finishExecution(env, claimed.id, paypalRef, pin);
-      return {
-        ...(done ?? { ...claimed, outcome: "executed" as const, paypal_ref: paypalRef, error: null, approver: opts.approver ?? claimed.approver }),
-        wonTransition: true,
-      };
+      const row = done ?? { ...claimed, outcome: "executed" as const, paypal_ref: paypalRef, error: null, approver: opts.approver ?? claimed.approver };
+      // Best-effort on purpose: PayPal has already moved the money, so throwing here would report a
+      // failure for something that succeeded. The `actions` row remains the primary record; this adds
+      // the chain entry, and a failure is logged loudly rather than hidden.
+      await appendAuditQuietly(env, {
+        ref_type: "action",
+        ref_id: String(claimed.id),
+        event: "executed",
+        actor: opts.approver ?? "agent",
+        detail: { type: proposal.type, amount_cents: proposal.amount_cents ?? null, paypal_ref: paypalRef, policy_rule: row.policy_rule },
+      });
+      return { ...row, wonTransition: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const failed = await failExecution(env, claimed.id, message, claimed.error ?? "");
@@ -418,6 +427,25 @@ export async function resolveReviewItem(
       WHERE id = ?3 AND status = 'open'`,
   ).bind(input.status, input.by, id).run();
   if (res.meta.changes === 0) return null;
+
+  // Record the human decision on the chain. Best-effort, like the action path: the resolution has already
+  // committed and the `review_queue` row carries `resolved_by`/`resolved_at`, so throwing here would report
+  // a failure for a decision that stands. Approving a classification also posts an entry, which `postEntry`
+  // audits atomically — this row is what explains *who decided what*, not what was written to the books.
+  await appendAuditQuietly(env, {
+    ref_type: "review",
+    ref_id: String(id),
+    event: "resolved",
+    actor: input.by,
+    detail: {
+      status: input.status,
+      kind: item.kind,
+      transaction_id: item.ref_id,
+      account_override: input.accountOverride ?? null,
+      entry_id: entryId,
+      reasons: item.reasons,
+    },
+  });
   return { resolved: true, entryId };
 }
 

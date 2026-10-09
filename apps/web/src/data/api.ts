@@ -16,7 +16,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-import type { CoaAccount, LedgerEntryResponse, LedgerLine, PnlRow, ReviewItem } from "../../../../packages/contracts/api";
+import type { AuditResponse, AuditVerifyResponse, CoaAccount, LedgerEntryResponse, LedgerLine, PnlRow, ReviewItem } from "../../../../packages/contracts/api";
+import { parseAudit, parseAuditVerify } from "./audit";
 import { coa as FIXTURE_COA, parseCoa } from "./coa";
 import {
   ledgerEntry as FIXTURE_ENTRY,
@@ -49,6 +50,8 @@ export const RECONCILE_PATH = "/api/reconcile";
 export const PNL_PATH = "/api/reports/pnl";
 export const REVIEW_PATH = "/api/review";
 export const COA_PATH = "/api/coa";
+export const AUDIT_PATH = "/api/audit";
+export const AUDIT_VERIFY_PATH = "/api/audit/verify";
 
 /** The shipped review fixture, used when the Worker is unreachable. */
 const FIXTURE_REVIEW: ReviewItem[] = parseReviewItems(reviewJson);
@@ -96,6 +99,34 @@ export const loadReview = (): Promise<Loaded<ReviewItem[]>> =>
   loaded(REVIEW_PATH, parseReviewItems, FIXTURE_REVIEW);
 
 export const loadCoa = (): Promise<Loaded<CoaAccount[]>> => loaded(COA_PATH, parseCoa, FIXTURE_COA);
+
+/**
+ * The audit trail deliberately has NO fixture fallback, unlike every other screen.
+ *
+ * A recorded fixture is fine for a ledger — it is data the user can see is stale. A trail is *evidence*:
+ * rendering a fabricated chain, even behind a badge, would be the one lie this product cannot tell. If the
+ * read fails the trail is empty and the badge says why.
+ */
+export async function loadAudit(): Promise<Loaded<AuditResponse>> {
+  try {
+    return { data: parseAudit(await getJson(AUDIT_PATH), `GET ${AUDIT_PATH}`), source: "live", error: null };
+  } catch (err) {
+    return { data: { events: [], story: [] }, source: "fixture", error: message(err) };
+  }
+}
+
+/**
+ * Verification is three-valued, not two: `ok`, `broken`, or **unavailable**. Returning `{ok: true}` on a
+ * failed read would assert the chain is intact when nothing was checked; returning `{ok: false}` would
+ * assert tampering. Neither is known, so the caller gets null and must say so.
+ */
+export async function loadAuditVerify(): Promise<Loaded<AuditVerifyResponse | null>> {
+  try {
+    return { data: parseAuditVerify(await getJson(AUDIT_VERIFY_PATH), `GET ${AUDIT_VERIFY_PATH}`), source: "live", error: null };
+  } catch (err) {
+    return { data: null, source: "fixture", error: message(err) };
+  }
+}
 
 // ── review decisions (the only mutating call the dashboard makes) ────────────────────────────────
 
