@@ -81,6 +81,22 @@ refusing to act on text a counterparty controls.
 The reconciliation does not just report a mismatch — it names the cause: exactly the three captures sitting
 in the review queue, unposted.
 
+**The agent proposes an action, and refuses its own proposal**
+
+`POST /api/actions/propose` runs a proposal through the same two keys as everything else: Clef's
+consistency question, then the deterministic policy gate.
+
+| Step | Observed |
+|---|---|
+| The refund the injected text demanded | `{"outcome":"blocked","policy_rule":"refund_over_hard_cap"}`, `paypal_ref null` — PayPal was never called |
+| A legitimate `$2,500` vendor payout | `{"outcome":"review","policy_rule":"payout_over_autonomous_limit"}` |
+| Human approves it | `{"outcome":"executed","paypal_ref":"PKMU7VDGVCP8Q"}` — a real PayPal payout batch |
+| The chain afterwards | 3 events, `GET /api/audit/verify` → `{"ok":true}` |
+
+The last line of the trail reads *"PayPal payout executed as PKMU7VDGVCP8Q (approved by Joseph)"*. Money
+moved, a named human authorized it, and the chain records both — which is the whole argument for letting an
+agent near a business's books.
+
 ## How PayPal and AI are used
 
 | Capability | Used for | Status |
@@ -90,7 +106,8 @@ in the review queue, unposted.
 | Webhooks (signature-verified, deduped) | Real-time updates | verified live; recorded then dropped (see above) |
 | Workers AI — Clef / clef-flash | Decisions, incl. injection detection | **working** — live decision at p=0.966 |
 | Invoicing v2 | AR reminders | client + approval route built; **no action has executed yet** |
-| Payouts | Paying approved vendor bills | client + approval route built; **nothing executed** (`GET /api/actions` is empty) |
+| Payouts | Paying approved vendor bills | **working** — a real payout executed after human approval (`PKMU7VDGVCP8Q`) |
+| Refunds | Returning a customer's payment | **working** as a gate: policy blocks over the cap before PayPal is called |
 | Disputes | Dispute triage | client + approval route built; **nothing executed** |
 | AG Grid | Ledger grid, review queue, drill-through | **working** — reads the live Worker |
 
@@ -110,28 +127,35 @@ Plus an append-only ledger, enforced by SQLite triggers that reject any `UPDATE`
 `journal_entries` and `journal_lines` (`migrations/0002_journal_approver.sql`) — a correction is a
 reversal entry, never an edit. Approving a contested item records a named human as the entry's approver.
 
+4. **A hash-chained audit trail.** Every mutation of the books and every move of money appends a row whose
+   hash covers its own contents *and* the previous row's hash, so altering history breaks every hash after
+   it. `GET /api/audit/verify` recomputes the chain and names the first row that fails. The trail reads
+   openly — checking it controls nothing.
+
 ## What is NOT built yet
 
-We only document what works, so here is the other half of the ledger. These are declared in
-`packages/contracts/api.ts` but **return 404 today**:
+We only document what works, so here is the other half of the ledger.
 
-- **Hash-chained audit trail** (`GET /api/audit`, `GET /api/audit/verify`). The routes are empty stubs
-  and there is no `audit_log` table — the planned migration was never written. `docs/18-finish-roadmap.md`
-  carries it as an open task. Nothing in this README depends on it, and no screen claims it.
-- **Autonomy dial** (`GET|PUT /api/settings/auto_post_threshold`). The threshold is a deployment
-  setting (`AUTO_POST_THRESHOLD` in `wrangler.jsonc`), not something a controller can turn at runtime.
-- **`GET /api/confidence/sweep`** and its dashboard widget.
+Cut deliberately, not missed: an **autonomy dial** (`GET|PUT /api/settings/auto_post_threshold`, and the
+`GET /api/confidence/sweep` behind it). The threshold is a deployment setting (`AUTO_POST_THRESHOLD` in
+`wrangler.jsonc`), not something a controller can turn at runtime. Materiality is enforced by fixed policy
+caps and the confidence gate, and we would rather say that than show a dial that does not turn. Those two
+endpoints **return 404 today**.
 
-Also unfinished, with the reason:
+Still unfinished, with the reason:
 
 - **The `Sync` and `Agent actions` screens.** Both are listed as *planned* in the dashboard nav and are
-  deliberately not selectable. Sync runs on an hourly cron and via `POST /api/sync`.
+  deliberately not selectable. Sync runs on an hourly cron and via `POST /api/sync`; actions run through
+  `POST /api/actions/propose`.
 - **Webhook events are verified and deduped, then dropped.** `handleSyncBatch` carries a
   `// TODO: webhook events → map resource to transaction`, so a payment booking waits for the next
   Transaction Search sync (PayPal's search index lags captures by roughly three hours) instead of
   booking on the webhook. This is the single biggest remaining engineering gap.
+- **Only refunds and payouts have executed.** Invoice reminders and dispute triage have clients and an
+  approval route, but nothing has run them; `GET /api/actions` shows exactly what has.
 - **Managerial reporting is P&L by product line, AR aging and reconciliation — not the full set.** No
   budget-vs-actual variance, no cash forecast, no dimensions beyond product line.
+
 
 ## Run it
 
@@ -206,7 +230,7 @@ _TODO: YouTube link._
 |---|---|
 | `apps/worker/src` | Sync, Clef decisions, policy, ledger, reconcile, review, audit |
 | `apps/worker/migrations` | D1 schema (append-only triggers included) |
-| `apps/web/src` | Dashboard: AG Grid ledger, review queue with provenance, managerial widgets |
+| `apps/web/src` | Dashboard: AG Grid ledger, review queue with provenance, audit trail, managerial widgets |
 | `packages/contracts` | Shared API types + fixtures the dashboard validates payloads against |
 | `scripts/seed-sandbox.mjs` | Sandbox activity seeding |
 | `docs/` | Architecture, build plan, roadmap, `sandbox-activity.md` |
@@ -215,12 +239,15 @@ _TODO: YouTube link._
 ## Testing
 
 ```bash
-cd apps/worker && npm test      # 144 tests
-cd apps/web && npm test         # 97 tests
+cd apps/worker && npm test      # 166 tests
+cd apps/web && npm test         # 103 tests
 ```
 
-Both suites include guards for bugs that only appeared when deployed — a detached `env.AI.run` receiver
-and a detached `fetch` receiver — each proven by re-introducing the bug and watching the test fail.
+The audit tests are mostly attacks — edit a row, rewrite an actor to hide who approved something, delete a
+middle row, forge a link, reorder two rows, or re-claim a predecessor to fork the chain — and each must be
+caught at the exact sequence number. The rest of the suite includes guards for bugs that only appeared when
+deployed: a detached `env.AI.run` receiver and a detached `fetch` receiver, each proven by re-introducing
+the bug and watching the test fail.
 
 ## Evals
 

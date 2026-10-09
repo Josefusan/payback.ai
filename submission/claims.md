@@ -160,3 +160,36 @@ still no code reference; these must be integrated or deleted before submission).
 **Rule reminder (INV-7):** README, Devpost text and the video must all match the live build. §"What is NOT
 built yet" exists so that a judge comparing the README to the running system finds it accurate.
 
+## 7. Re-audit — 2026-10-09 (audit trail built; the dial cut; the video plan rewritten)
+
+Two decisions closed the largest integrity gaps from §6: the audit trail was built (it was claimed with no
+code behind it), and the autonomy dial was **cut from the pitch** rather than built, so nothing now promises
+it. Evidence below is live against `https://payback.clarktechventures.workers.dev`.
+
+| Claim id | Was | Now |
+|---|---|---|
+| C-NA-01 (hash-chained audit trail ABSENT) | absent | **Reversed — it exists.** `migrations/0003_audit.sql`, `src/audit.ts`, `GET /api/audit` + `/api/audit/verify` (both 200), and an Audit trail screen. `verify` returns `{"ok":true}` live. The `C-NA-01` claim of absence is deleted from the README |
+| C-NA-02 (autonomy dial ABSENT) | absent | **Still absent, now by decision.** The dial is cut from the pitch; `README.md` says so explicitly and `docs/11-demo-video-plan.md` §"Do not claim on camera" forbids it. The endpoint still 404s, and that is now the documented position rather than a gap |
+| C-VID-02 (dial demoed on camera) | UNBACKED | **REMOVED.** `docs/11-demo-video-plan.md` was rewritten; the dial beat is replaced by the review-queue and audit-trail beats, and the dial is listed under "Do not claim on camera" |
+| C-README-05 / C-DEV-05 / C-VID-03 (acts through PayPal) | PARTIAL | **BACKED for payouts and refunds.** A real payout executed after human approval: `{"outcome":"executed","paypal_ref":"PKMU7VDGVCP8Q"}`. Invoice reminders and disputes remain unexecuted and are excluded from the claim |
+| C-VID-05 (month-end close / Controller agent) | UNBACKED | Still unbacked, and now listed under "Do not claim on camera" so it cannot reach the video by accident |
+
+### New claims (all BACKED live)
+
+| id | Claim | Evidence |
+|---|---|---|
+| C-N-07 | Tampering with the trail is detectable, reported at the first bad row | `src/audit.test.ts` (6 attacks: edit, actor rewrite, delete, forge, reorder, fork); `GET /api/audit/verify` |
+| C-N-08 | The audit row is written in the same transaction as the mutation it records | `pipeline.ts` autonomous post + opening balance, `ledger.ts` `postEntry`/`reverseEntry` — all `env.DB.batch([…, auditInsert(…, await buildAuditRow(…, await readTail(env)))])` |
+| C-N-09 | A proposal cannot move money without passing both keys | `POST /api/actions/propose`; $5,000 refund → `blocked`/`refund_over_hard_cap` with `paypal_ref null` and PayPal never called; $2,500 payout → `review`/`payout_over_autonomous_limit` |
+| C-N-10 | The audit screen never fabricates a trail, and verification is three-valued | `apps/web/src/data/api.ts` (`loadAudit` has no fixture fallback; `loadAuditVerify` returns null on failure); `AuditScreen.test.tsx` asserts "unavailable" ≠ "intact" |
+
+### Still open before G5
+
+| Item | Blocking |
+|---|---|
+| Video (`submission/video.json` = PLACEHOLDER) | C-README-23, C-DEV-13 — the script is now honest and recordable; the recording itself is outstanding |
+| Devpost text (`devpost-description.md`) | C-DEV-01…C-DEV-12 — still the 2026-10-05 draft; needs the same line-by-line pass §6/§7 gave the README |
+| Repo still **PRIVATE** | Submission requires public; `decisions.md` reads "private until submission week, then public" — a deliberate choice, not an oversight |
+| C-README-16/17/18 (Agent Toolkit / AI-Toolkit / APIMatic) | Still no code reference; integrate or delete before submission |
+
+

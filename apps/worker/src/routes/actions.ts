@@ -9,6 +9,19 @@ import type { ActionProposal } from "../policy";
 
 export const actions = new Hono<AppEnv>();
 
+const ACTION_TYPES = ["payout", "refund", "invoice_reminder", "invoice_create", "dispute_accept"] as const;
+
+/** A proposal is only ever a type plus its identifiers and an amount; anything else is not one. */
+function isActionProposal(value: unknown): value is ActionProposal {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (typeof record.type !== "string" || !(ACTION_TYPES as readonly string[]).includes(record.type)) return false;
+  if (record.amount_cents !== undefined && (typeof record.amount_cents !== "number" || !Number.isInteger(record.amount_cents))) {
+    return false;
+  }
+  return true;
+}
+
 /** Parse a positive-integer path id. Returns null for anything else, so garbage ids never 500. */
 function parseId(raw: string): number | null {
   if (!/^[0-9]+$/.test(raw)) return null;
@@ -35,6 +48,32 @@ actions.get("/api/actions", async (c) => {
   }
   const rows: ActionsResponse = await listActions(c.env, { outcome: isActionOutcome(outcome) ? outcome : undefined });
   return c.json(rows);
+});
+
+// The agent's action entry point (T-L1-005). A proposal is evaluated through the SAME path production and
+// the safety eval use: Clef consistency (key #1), then the deterministic policy gate (key #2), recorded as
+// an `actions` row. Two outcomes are possible without a human — `auto` (within every limit) and `blocked`
+// (refused by policy, and no human can override that) — while `review` waits for `/api/actions/:id/approve`.
+// Gated on the admin token because an `auto` verdict moves real sandbox money.
+actions.use("/api/actions/propose", requireAdmin);
+actions.post("/api/actions/propose", async (c) => {
+  const parsed = await readJson<{ proposal?: unknown; context?: unknown }>(c);
+  if (!parsed.ok) return c.json({ error: "invalid_json" }, 400);
+  if (!isActionProposal(parsed.body.proposal)) return c.json({ error: "invalid_proposal" }, 400);
+
+  // `context` is counterparty-controlled text (a note, an email). It goes to Clef as untrusted evidence
+  // and is never parsed for instructions — the proposal already came from it either way.
+  const context = typeof parsed.body.context === "string" ? parsed.body.context : undefined;
+  const result = await executeProposal(c.env, parsed.body.proposal, { dryRun: false, context });
+
+  return c.json({
+    ok: result.outcome === "executed",
+    id: result.id,
+    outcome: result.outcome,
+    policy_rule: result.policy_rule,
+    paypal_ref: result.paypal_ref,
+    error: result.error ?? null,
+  });
 });
 
 // Human approval of a review-queued action: the SAME executeProposal production and the eval use, with
