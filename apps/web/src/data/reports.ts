@@ -12,7 +12,8 @@
  * shared ledger fixture carries no 1200 lines yet, so AR aging falls back to a clearly-labelled local
  * demo set (`receivables-demo.ts`, apps/web only) until the Worker posts receivables at G2.
  */
-import type { LedgerLine, PnlRow } from "../../../../packages/contracts/api";
+import type { BudgetVarianceResponse, BudgetVarianceRow, BudgetVarianceSide, LedgerLine, PnlRow } from "../../../../packages/contracts/api";
+import budgetVarianceJson from "../../../../packages/contracts/fixtures/reports-budget-variance.json";
 import pnlJson from "../../../../packages/contracts/fixtures/reports-pnl.json";
 import reconcileJson from "../../../../packages/contracts/fixtures/reconcile.json";
 import { ledgerLines } from "./fixtures";
@@ -122,6 +123,74 @@ export const reconcile: ReconcileSummary = reconcileSummary(reconcileRows);
 // ── P&L by product line ──────────────────────────────────────────────────────────────────────────
 export type PnlType = PnlRow["type"];
 const PNL_TYPES: readonly PnlType[] = ["revenue", "contra_revenue", "cogs", "expense"];
+
+export const BUDGET_VARIANCE_FIXTURE_PATH = "packages/contracts/fixtures/reports-budget-variance.json";
+
+/**
+ * Budget vs actual for a period. Both money columns are the account's natural magnitude (revenue as a
+ * credit, cost as a debit), so the two halves of the report read the same direction; `favourable` is what
+ * says whether the difference is good news, and it is null when there is no budget to judge against.
+ */
+export function parseBudgetVariance(raw: unknown, where = BUDGET_VARIANCE_FIXTURE_PATH): BudgetVarianceResponse {
+  const root = asRecord(raw);
+  if (!root) throw new Error(`IF-01 fixture mismatch in ${where}: expected an object`);
+  if (!Array.isArray(root.rows)) throw new Error(`IF-01 fixture mismatch in ${where}: rows must be an array`);
+
+  const rows = root.rows.map((entry, index) => {
+    const row = asRecord(entry);
+    if (!row) throw new Error(`IF-01 fixture mismatch in ${where}: rows[${index}] must be an object`);
+    const type = row.type;
+    if (typeof type !== "string" || !(PNL_TYPES as readonly string[]).includes(type)) {
+      throw new Error(`IF-01 fixture mismatch in ${where}: rows[${index}].type must be one of ${PNL_TYPES.join(", ")}`);
+    }
+    const code = optionalString(row.account_code) ?? "";
+    return {
+      account_code: code,
+      name: optionalString(row.name) ?? code,
+      type: type as BudgetVarianceRow["type"],
+      budget_cents: optionalNumber(row.budget_cents) ?? 0,
+      actual_cents: optionalNumber(row.actual_cents) ?? 0,
+      variance_cents: optionalNumber(row.variance_cents) ?? 0,
+      // Deliberately optional: null is a real answer here (a percentage of a zero budget), not a gap.
+      variance_pct: optionalNumber(row.variance_pct),
+      favourable: optionalBoolean(row.favourable),
+    };
+  });
+
+  const side = (raw: unknown): BudgetVarianceSide => {
+    const row = asRecord(raw) ?? {};
+    return {
+      budget_cents: optionalNumber(row.budget_cents) ?? 0,
+      actual_cents: optionalNumber(row.actual_cents) ?? 0,
+      variance_cents: optionalNumber(row.variance_cents) ?? 0,
+    };
+  };
+  const totalsRow = asRecord(root.totals) ?? {};
+  const netRow = asRecord(totalsRow.net) ?? {};
+
+  return {
+    period: optionalString(root.period) ?? "",
+    rows,
+    totals: {
+      revenue: side(totalsRow.revenue),
+      cost: side(totalsRow.cost),
+      net: { ...side(totalsRow.net), favourable: optionalBoolean(netRow.favourable) },
+    },
+  };
+}
+
+export const budgetVariance: BudgetVarianceResponse = parseBudgetVariance(budgetVarianceJson);
+
+/** What the widget renders before the read lands: shaped, empty, and claiming nothing. */
+export const EMPTY_BUDGET_VARIANCE: BudgetVarianceResponse = {
+  period: "",
+  rows: [],
+  totals: {
+    revenue: { budget_cents: 0, actual_cents: 0, variance_cents: 0 },
+    cost: { budget_cents: 0, actual_cents: 0, variance_cents: 0 },
+    net: { budget_cents: 0, actual_cents: 0, variance_cents: 0, favourable: null },
+  },
+};
 
 export function parsePnlRows(raw: unknown, where = PNL_FIXTURE_PATH): PnlRow[] {
   if (!Array.isArray(raw)) {

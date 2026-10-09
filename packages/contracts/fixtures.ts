@@ -12,6 +12,7 @@ import health from "./fixtures/health.json";
 import ledger from "./fixtures/ledger.json";
 import ledgerEntry from "./fixtures/ledger-entry.json";
 import reconcile from "./fixtures/reconcile.json";
+import reportsBudgetVariance from "./fixtures/reports-budget-variance.json";
 import reportsPnl from "./fixtures/reports-pnl.json";
 import review from "./fixtures/review.json";
 import reviewResolve from "./fixtures/review-resolve.json";
@@ -33,6 +34,7 @@ export const FIXTURES: Record<string, unknown> = {
   "ledger": ledger,
   "ledger-entry": ledgerEntry,
   "reconcile": reconcile,
+  "reports-budget-variance": reportsBudgetVariance,
   "reports-pnl": reportsPnl,
   "review": review,
   "review-resolve": reviewResolve,

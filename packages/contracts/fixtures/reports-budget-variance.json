@@ -1,0 +1,16 @@
+{
+  "period": "2026-10",
+  "rows": [
+    { "account_code": "4000", "name": "Product revenue", "type": "revenue", "budget_cents": 200000, "actual_cents": 184200, "variance_cents": -15800, "variance_pct": -7.9, "favourable": false },
+    { "account_code": "4100", "name": "Services revenue", "type": "revenue", "budget_cents": 400000, "actual_cents": 450000, "variance_cents": 50000, "variance_pct": 12.5, "favourable": true },
+    { "account_code": "4900", "name": "Refunds & returns", "type": "contra_revenue", "budget_cents": 5000, "actual_cents": 4900, "variance_cents": -100, "variance_pct": -2, "favourable": true },
+    { "account_code": "6050", "name": "PayPal / merchant fees", "type": "expense", "budget_cents": 9000, "actual_cents": 7140, "variance_cents": -1860, "variance_pct": -20.67, "favourable": true },
+    { "account_code": "6100", "name": "Software & subscriptions", "type": "expense", "budget_cents": 15000, "actual_cents": 15000, "variance_cents": 0, "variance_pct": 0, "favourable": true },
+    { "account_code": "6300", "name": "Contractors", "type": "expense", "budget_cents": 120000, "actual_cents": 132000, "variance_cents": 12000, "variance_pct": 10, "favourable": false }
+  ],
+  "totals": {
+    "revenue": { "budget_cents": 605000, "actual_cents": 634200, "variance_cents": 29200 },
+    "cost": { "budget_cents": 149000, "actual_cents": 159040, "variance_cents": 10040 },
+    "net": { "budget_cents": 456000, "actual_cents": 475160, "variance_cents": 19160, "favourable": true }
+  }
+}

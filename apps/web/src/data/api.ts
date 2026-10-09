@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-import type { AuditResponse, AuditVerifyResponse, CoaAccount, LedgerEntryResponse, LedgerLine, PnlRow, ReviewItem, SweepPoint, ThresholdSetting } from "../../../../packages/contracts/api";
+import type { AuditResponse, AuditVerifyResponse, BudgetVarianceResponse, CoaAccount, LedgerEntryResponse, LedgerLine, PnlRow, ReviewItem, SweepPoint, ThresholdSetting } from "../../../../packages/contracts/api";
 import { parseAudit, parseAuditVerify } from "./audit";
 import { coa as FIXTURE_COA, parseCoa } from "./coa";
 import {
@@ -26,6 +26,8 @@ import {
   parseLedgerLines,
 } from "./fixtures";
 import {
+  budgetVariance as budgetVarianceFixture,
+  parseBudgetVariance,
   parsePnlRows,
   parseReconcileRows,
   pnlRows as FIXTURE_PNL,
@@ -55,6 +57,7 @@ export const AUDIT_PATH = "/api/audit";
 export const AUDIT_VERIFY_PATH = "/api/audit/verify";
 export const THRESHOLD_PATH = "/api/settings/auto_post_threshold";
 export const SWEEP_PATH = "/api/confidence/sweep";
+export const BUDGET_VARIANCE_PATH = "/api/reports/budget-variance";
 
 /** The shipped review fixture, used when the Worker is unreachable. */
 const FIXTURE_REVIEW: ReviewItem[] = parseReviewItems(reviewJson);
@@ -97,6 +100,10 @@ export const loadReconcile = (): Promise<Loaded<ReconcileView[]>> =>
   loaded(RECONCILE_PATH, parseReconcileRows, FIXTURE_RECONCILE);
 
 export const loadPnl = (): Promise<Loaded<PnlRow[]>> => loaded(PNL_PATH, parsePnlRows, FIXTURE_PNL);
+
+/** Budget vs actual falls back to the shipped fixture like the other reports — stale data is visible as stale. */
+export const loadBudgetVariance = (): Promise<Loaded<BudgetVarianceResponse>> =>
+  loaded(BUDGET_VARIANCE_PATH, parseBudgetVariance, budgetVarianceFixture);
 
 export const loadReview = (): Promise<Loaded<ReviewItem[]>> =>
   loaded(REVIEW_PATH, parseReviewItems, FIXTURE_REVIEW);

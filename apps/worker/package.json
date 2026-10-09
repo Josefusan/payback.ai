@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "dev:local": "wrangler dev --local",
-    "deploy": "wrangler deploy",
+    "deploy": "npm --prefix ../web run build && wrangler deploy",
+    "deploy:worker-only": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply payback --local",
     "db:migrate:remote": "wrangler d1 migrations apply payback --remote",
     "typecheck": "tsc --noEmit",

@@ -154,6 +154,54 @@ export interface AuditVerifyResponse { ok: boolean; broken_at_seq?: number }
 export interface CloseRequest { period: string /* YYYY-MM */; by: string }
 export interface CloseResponse { ok: boolean; period: string; entry_id: number | null; memo_md: string; checks: { name: string; ok: boolean }[] }
 
+/**
+ * `GET /api/reports/budget-variance` — the report a management accountant reaches for first.
+ *
+ * Both `budget_cents` and `actual_cents` are the account's **natural magnitude**, always positive for
+ * ordinary activity: revenue is credit − debit, cost is debit − credit. Reporting them on one signed
+ * scale would make "over budget" mean opposite things on a revenue line and an expense line, which is
+ * exactly the confusion the favourability flag exists to prevent.
+ *
+ * `contra_revenue` (refunds) is **cost-like** for both purposes: it is debit-natural, and giving more
+ * refunds than planned is not good news. It is the one account type where the P&L grouping and the sign
+ * convention disagree, so it is called out rather than inferred from the type name.
+ */
+export interface BudgetVarianceRow {
+  account_code: string;
+  name: string;
+  type: "revenue" | "contra_revenue" | "cogs" | "expense";
+  budget_cents: Cents;
+  actual_cents: Cents;
+  /** actual − budget, in natural magnitude. Sign alone does not say whether this is good news. */
+  variance_cents: Cents;
+  /** null when the budget is 0: a percentage of nothing is not a number. */
+  variance_pct: number | null;
+  /** Revenue beating budget is favourable; cost exceeding budget is not. null when there is no budget. */
+  favourable: boolean | null;
+}
+
+/** One half of the report, plus the net. Net is revenue − cost: the effect on the bottom line. */
+export interface BudgetVarianceSide {
+  budget_cents: Cents;
+  actual_cents: Cents;
+  variance_cents: Cents;
+}
+export interface BudgetVarianceTotals {
+  revenue: BudgetVarianceSide;
+  cost: BudgetVarianceSide;
+  /**
+   * Revenue minus cost for each column. Summing the two sides' raw magnitudes would produce a number that
+   * means nothing, so the only total offered is the one that adds up to something: the bottom line.
+   */
+  net: BudgetVarianceSide & { favourable: boolean | null };
+}
+
+export interface BudgetVarianceResponse {
+  period: string; // YYYY-MM
+  rows: BudgetVarianceRow[];
+  totals: BudgetVarianceTotals;
+}
+
 // ── Registry: one row per endpoint, consumed by the fixture test and the Postman collection ──
 export type Lane = "INT" | "L1" | "L2" | "L3";
 export interface Endpoint { method: "GET" | "POST" | "PUT"; path: string; lane: Lane; fixture: string; shape: "array" | "object" }
@@ -176,6 +224,7 @@ export const ENDPOINTS: readonly Endpoint[] = [
   { method: "GET", path: "/api/coa", lane: "L3", fixture: "coa", shape: "array" },
   { method: "GET", path: "/api/reconcile", lane: "L3", fixture: "reconcile", shape: "array" },
   { method: "GET", path: "/api/reports/pnl", lane: "L3", fixture: "reports-pnl", shape: "array" },
+  { method: "GET", path: "/api/reports/budget-variance", lane: "L3", fixture: "reports-budget-variance", shape: "object" },
   { method: "GET", path: "/api/audit", lane: "L3", fixture: "audit", shape: "object" },
   { method: "GET", path: "/api/audit/verify", lane: "L3", fixture: "audit-verify", shape: "object" },
   { method: "POST", path: "/api/close", lane: "L3", fixture: "close", shape: "object" },

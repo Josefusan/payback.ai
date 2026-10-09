@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 
-import { LEDGER_PATH, loadLedger, loadPnl, loadReconcile, PNL_PATH, RECONCILE_PATH, useLive } from "../data/api";
-import { deriveARAging, pnlByProductLine, receivableSourceLines } from "../data/reports";
+import { BUDGET_VARIANCE_PATH, LEDGER_PATH, loadBudgetVariance, loadLedger, loadPnl, loadReconcile, PNL_PATH, RECONCILE_PATH, useLive } from "../data/api";
+import { deriveARAging, EMPTY_BUDGET_VARIANCE, pnlByProductLine, receivableSourceLines } from "../data/reports";
 import { ARAgingWidget } from "./ARAgingWidget";
+import { BudgetVariance } from "./BudgetVariance";
 import { ConfidenceDial } from "./ConfidenceDial";
 import { PnLByProductLine } from "./PnLByProductLine";
 import { ReconciliationTile } from "./ReconciliationTile";
@@ -23,6 +24,7 @@ export function ManagerialDashboard() {
   const ledger = useLive(LEDGER_PATH, loadLedger);
   const reconcile = useLive(RECONCILE_PATH, loadReconcile);
   const pnl = useLive(PNL_PATH, loadPnl);
+  const budget = useLive(BUDGET_VARIANCE_PATH, loadBudgetVariance);
 
   const lines = useMemo(() => ledger.data ?? [], [ledger.data]);
   const reconcileRows = useMemo(() => reconcile.data ?? [], [reconcile.data]);
@@ -31,10 +33,10 @@ export function ManagerialDashboard() {
   const arAging = useMemo(() => deriveARAging(receivableSourceLines(lines), AS_OF), [lines]);
   const pnlByProduct = useMemo(() => pnlByProductLine(pnlRows), [pnlRows]);
 
-  const loading = ledger.loading || reconcile.loading || pnl.loading;
-  // One badge for three reads: a single degraded source is worth surfacing, so "fixture" wins over "live".
-  const source = loading ? null : [ledger.source, reconcile.source, pnl.source].includes("fixture") ? "fixture" : "live";
-  const error = ledger.error ?? reconcile.error ?? pnl.error;
+  const loading = ledger.loading || reconcile.loading || pnl.loading || budget.loading;
+  // One badge for the reads: a single degraded source is worth surfacing, so "fixture" wins over "live".
+  const source = loading ? null : [ledger.source, reconcile.source, pnl.source, budget.source].includes("fixture") ? "fixture" : "live";
+  const error = ledger.error ?? reconcile.error ?? pnl.error ?? budget.error;
 
   return (
     <main className="app-main">
@@ -58,6 +60,8 @@ export function ManagerialDashboard() {
         </div>
 
         <PnLByProductLine pnl={pnlByProduct} />
+
+        <BudgetVariance variance={budget.data ?? EMPTY_BUDGET_VARIANCE} loading={budget.loading} />
       </section>
     </main>
   );
