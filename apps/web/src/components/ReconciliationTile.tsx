@@ -6,6 +6,8 @@ export interface ReconciliationTileProps {
   rows: ReconcileView[];
   /** Optional as-of label rendered next to the title. */
   asOf?: string;
+  /** True while the tie-out is still being fetched. Distinguishes "not read yet" from "no rows". */
+  loading?: boolean;
 }
 
 /** AG Studio `formatShape` — lets the Controller agent read/configure the tile's data. */
@@ -43,9 +45,10 @@ function badge(ok: boolean | null): { label: string; className: string } {
  * ReconciliationTile (T-L4-003): PayPal balance vs ledger vs pending and an ok/not-ok badge. Every
  * field is optional, so a fixture missing the pending bucket (T-L3-001 adds it) shows "—", not $0.00.
  */
-export function ReconciliationTile({ rows, asOf }: ReconciliationTileProps) {
+export function ReconciliationTile({ rows, asOf, loading = false }: ReconciliationTileProps) {
   const summary = reconcileSummary(rows);
-  const overall = badge(summary.ok);
+  // Never assert "Unknown" while the read is in flight: that is a claim about the books, not a spinner.
+  const overall = loading && rows.length === 0 ? { label: "Checking…", className: "badge badge--live-off" } : badge(summary.ok);
 
   return (
     <section className="widget" aria-labelledby="reconcile-heading" data-testid="reconciliation-tile">
@@ -64,7 +67,7 @@ export function ReconciliationTile({ rows, asOf }: ReconciliationTileProps) {
 
       {rows.length === 0 ? (
         <div className="empty" data-testid="reconcile-empty">
-          <strong>No reconciliation rows.</strong>
+          <strong>{loading ? "Reading the tie-out…" : "No reconciliation rows."}</strong>
         </div>
       ) : (
         <ul className="tile">

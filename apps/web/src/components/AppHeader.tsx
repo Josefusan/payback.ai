@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /** Screens that are actually built and selectable in the nav. */
-export type ScreenId = "ledger" | "managerial";
+export type ScreenId = "ledger" | "review" | "managerial";
 
 export interface AppHeaderProps {
   screen: ScreenId;
@@ -15,11 +15,12 @@ interface NavItem {
 
 const LIVE_SCREENS: NavItem[] = [
   { id: "ledger", label: "Ledger" },
+  { id: "review", label: "Review queue" },
   { id: "managerial", label: "Managerial dashboard" },
 ];
 
 /** Planned screens from the L4 brief, listed after the live ones and disabled until their tasks land. */
-const PLANNED_SCREENS = ["Sync", "Review queue", "Agent actions"] as const;
+const PLANNED_SCREENS = ["Sync", "Agent actions"] as const;
 
 function LiveNavItem({ item, current, onSelect }: { item: NavItem; current: boolean; onSelect: (s: ScreenId) => void }) {
   if (current) {

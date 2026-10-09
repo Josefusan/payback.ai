@@ -46,3 +46,14 @@ export const PRODUCT_LINES: Record<string, string> = {
 export function accountExists(code: string): boolean {
   return ACCOUNTS.some((a) => a.code === code);
 }
+
+/**
+ * `GET /api/coa` — the chart of accounts for the dashboard. The `clef` text is deliberately omitted:
+ * it is the model's own instruction sheet, and a reviewer needs the code and the name, not the prompt.
+ *
+ * Served from `ACCOUNTS` rather than the `accounts` table on purpose — `accountExists`, which validates
+ * a reviewer's override, tests this same list, so the picker and the validator cannot disagree.
+ */
+export function coaListing(): Array<Pick<Account, "code" | "name" | "type">> {
+  return ACCOUNTS.map(({ code, name, type }) => ({ code, name, type }));
+}

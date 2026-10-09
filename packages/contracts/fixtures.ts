@@ -4,6 +4,7 @@ import actionsApprove from "./fixtures/actions-approve.json";
 import audit from "./fixtures/audit.json";
 import auditVerify from "./fixtures/audit-verify.json";
 import close from "./fixtures/close.json";
+import coa from "./fixtures/coa.json";
 import confidenceSweep from "./fixtures/confidence-sweep.json";
 import evalAction from "./fixtures/eval-action.json";
 import evalDecide from "./fixtures/eval-decide.json";
@@ -24,6 +25,7 @@ export const FIXTURES: Record<string, unknown> = {
   "audit": audit,
   "audit-verify": auditVerify,
   "close": close,
+  "coa": coa,
   "confidence-sweep": confidenceSweep,
   "eval-action": evalAction,
   "eval-decide": evalDecide,

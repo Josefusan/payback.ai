@@ -51,7 +51,7 @@ export function ManagerialDashboard() {
         </p>
 
         <div className="widgets">
-          <ReconciliationTile rows={reconcileRows} asOf={reconcileRows[0]?.asOfTime?.slice(0, 10)} />
+          <ReconciliationTile rows={reconcileRows} asOf={reconcileRows[0]?.asOfTime?.slice(0, 10)} loading={reconcile.loading} />
           <ARAgingWidget aging={arAging} />
         </div>
 

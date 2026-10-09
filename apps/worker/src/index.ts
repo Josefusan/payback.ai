@@ -8,6 +8,7 @@ import { webhooks } from "./routes/webhooks";
 import { review } from "./routes/review";
 import { actions } from "./routes/actions";
 import { ledger } from "./routes/ledger";
+import { coa } from "./routes/coa";
 import { reports } from "./routes/reports";
 import { audit } from "./routes/audit";
 import { evalRoutes } from "./routes/eval";
@@ -20,6 +21,7 @@ app.route("/", webhooks); // L1
 app.route("/", review); // L1
 app.route("/", actions); // L1
 app.route("/", ledger); // L3
+app.route("/", coa); // L3
 app.route("/", reports); // L3
 app.route("/", audit); // L3
 app.route("/", evalRoutes); // L2

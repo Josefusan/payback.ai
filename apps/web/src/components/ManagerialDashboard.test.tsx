@@ -131,12 +131,23 @@ describe("App navigation (ledger ⇄ managerial dashboard)", () => {
     expect(await screen.findByTestId("pinned-totals")).toBeInTheDocument();
   });
 
-  it("keeps the other planned screens disabled", () => {
+  it("keeps the unbuilt screens disabled and the built ones reachable", () => {
     render(<App />);
 
-    expect(screen.queryByRole("button", { name: /sync/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /review queue/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^sync/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /agent actions/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Managerial dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review queue" })).toBeInTheDocument();
+  });
+
+  it("opens the review queue from the nav", async () => {
+    render(<App />);
+
+    await screen.findByTestId("pinned-totals");
+    fireEvent.click(screen.getByRole("button", { name: "Review queue" }));
+
+    // With no API in jsdom this falls back to the shipped fixture, which still carries one open item.
+    expect(await screen.findByTestId("queue-count")).toBeInTheDocument();
+    expect(screen.queryByTestId("pinned-totals")).not.toBeInTheDocument();
   });
 });

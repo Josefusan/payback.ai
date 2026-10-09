@@ -118,6 +118,25 @@ export interface PnlRow {
 }
 export type PnlResponse = PnlRow[];
 
+/** Account types in the chart of accounts (mirrors `apps/worker/src/coa.ts`). */
+export type AccountType =
+  | "asset"
+  | "liability"
+  | "equity"
+  | "revenue"
+  | "contra_revenue"
+  | "cogs"
+  | "expense"
+  | "other";
+
+/** `GET /api/coa` — the chart of accounts, so a reviewer can name the account they are overriding. */
+export interface CoaAccount {
+  code: string;
+  name: string;
+  type: AccountType;
+}
+export type CoaResponse = CoaAccount[];
+
 export interface AuditEvent {
   seq: number;
   ref_type: "journal_entry" | "action" | "setting" | "review";
@@ -154,6 +173,7 @@ export const ENDPOINTS: readonly Endpoint[] = [
   { method: "PUT", path: "/api/settings/auto_post_threshold", lane: "L2", fixture: "settings-threshold", shape: "object" },
   { method: "GET", path: "/api/ledger", lane: "L3", fixture: "ledger", shape: "array" },
   { method: "GET", path: "/api/ledger/:id", lane: "L3", fixture: "ledger-entry", shape: "object" },
+  { method: "GET", path: "/api/coa", lane: "L3", fixture: "coa", shape: "array" },
   { method: "GET", path: "/api/reconcile", lane: "L3", fixture: "reconcile", shape: "array" },
   { method: "GET", path: "/api/reports/pnl", lane: "L3", fixture: "reports-pnl", shape: "array" },
   { method: "GET", path: "/api/audit", lane: "L3", fixture: "audit", shape: "object" },
