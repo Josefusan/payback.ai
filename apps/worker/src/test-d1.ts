@@ -58,7 +58,7 @@ export function createLedgerDb(): TestD1 {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys = ON;");
   const here = (import.meta as unknown as { url: string }).url;
-  for (const file of ["0001_init.sql", "0002_journal_approver.sql", "0003_audit.sql"]) {
+  for (const file of ["0001_init.sql", "0002_journal_approver.sql", "0003_audit.sql", "0004_settings.sql"]) {
     db.exec(readFileSync(new URL(`../migrations/${file}`, here), "utf8"));
   }
   return {

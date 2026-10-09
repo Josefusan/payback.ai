@@ -216,6 +216,13 @@ function storyLine(event: AuditEvent): string {
       const reason = str("top_reason");
       return `${event.ref_id} stopped and sent to a human${reason ? ` — ${reason}` : ""}`;
     }
+    case "changed": {
+      const from = num("from");
+      const to = num("to");
+      const asked = num("requested");
+      const clamped = to !== null && asked !== null && asked !== to;
+      return `Auto-post threshold changed from ${from ?? "unset"} to ${to ?? "?"} by ${event.actor}${clamped ? `, clamped from ${asked}` : ""}`;
+    }
     default:
       return `${event.ref_type} ${event.ref_id}: ${event.event} by ${event.actor}`;
   }

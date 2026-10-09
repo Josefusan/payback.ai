@@ -11,6 +11,10 @@
 import type { Env } from "./env";
 import { CLEF_ACCOUNT_CRITERIA, PRODUCT_LINES } from "./coa";
 import { selectProvider } from "./decision-provider";
+import { defaultThreshold, effectiveThreshold } from "./settings";
+
+/** Re-exported for the providers that build their own gate: the threshold now lives with the dial. */
+export { defaultThreshold };
 
 /** `txn-v2` adds the injection-guard `contains_instructions` question (.claude/skills/feature-injection-guard). */
 export const SCHEMA_VERSION = "txn-v2";
@@ -103,10 +107,7 @@ export function isProb(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1;
 }
 
-export function defaultThreshold(env: Env): number {
-  const n = Number(env.AUTO_POST_THRESHOLD || "0.9");
-  return Number.isFinite(n) ? n : 0.9;
-}
+/** `defaultThreshold` moved to ./settings with the dial; imported and re-exported at the top of this file. */
 
 function validChoice(a: ClefAnswer | undefined, allowed: string[]): a is ChoiceAnswer {
   return !!a && a.type === "choice" && allowed.includes(a.choice) && isProb(a.probabilities?.[a.choice]);
@@ -174,7 +175,8 @@ export async function runClef(env: Env, model: string, payload: unknown): Promis
 
 /** Raw Clef path: clef-flash first, escalate to clef (27B) when uncertain. Never throws — failures route to review. */
 export async function clefDecideTransaction(env: Env, txn: TxnForDecision): Promise<TxnDecision> {
-  const threshold = defaultThreshold(env);
+  // The dial, read per decision: turning it changes what the very next transaction may post alone.
+  const threshold = await effectiveThreshold(env);
   let model = env.CLEF_MODEL;
   try {
     let answers = await runClef(env, model, buildTxnRequest(txn, model));

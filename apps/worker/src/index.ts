@@ -12,6 +12,7 @@ import { coa } from "./routes/coa";
 import { reports } from "./routes/reports";
 import { audit } from "./routes/audit";
 import { evalRoutes } from "./routes/eval";
+import { settings } from "./routes/settings";
 
 const app = new Hono<AppEnv>();
 
@@ -25,6 +26,7 @@ app.route("/", coa); // L3
 app.route("/", reports); // L3
 app.route("/", audit); // L3
 app.route("/", evalRoutes); // L2
+app.route("/", settings); // L4
 
 // T-INT-006 (AUD-7, P1.3 central_error_handler): one audited JSON 500 per unhandled handler throw.
 // A thrown handler error never escapes as a bare runtime error: it is logged as one structured line
