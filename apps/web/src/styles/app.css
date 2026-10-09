@@ -14,93 +14,217 @@ body {
   background: var(--pb-bg);
   color: var(--pb-ink);
   font-family: var(--pb-font);
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: var(--pb-text-base);
+  line-height: var(--pb-leading);
+  -webkit-font-smoothing: antialiased;
 }
 
 .app {
-  min-height: 100%;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: var(--pb-sidebar-w) minmax(0, 1fr);
+  background: var(--pb-bg);
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────── */
+.sidebar {
   display: flex;
   flex-direction: column;
-}
-
-/* ── Header ─────────────────────────────────────────────────────────── */
-.app-header {
+  gap: var(--pb-space-2);
   background: var(--pb-navy);
-  color: #fff;
-  padding: var(--pb-space-3) var(--pb-space-5);
+  border-right: 1px solid var(--pb-border);
+  padding: var(--pb-space-3);
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: hidden auto;
+}
+
+.sidebar__head {
   display: flex;
   align-items: center;
-  gap: var(--pb-space-4);
-  flex-wrap: wrap;
+  gap: var(--pb-space-2);
+  padding: var(--pb-space-1) var(--pb-space-2) var(--pb-space-3);
 }
 
-.app-header__brand {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+.sidebar__brand {
+  font-size: var(--pb-text-base);
+  font-weight: var(--pb-weight-semibold);
+  letter-spacing: var(--pb-tracking-tight);
+  color: var(--pb-ink);
+  white-space: nowrap;
 }
 
-.app-header__brand span {
-  color: #7dd3c8;
+.sidebar__brand span {
+  color: var(--pb-accent);
 }
 
-.app-nav {
-  display: flex;
-  gap: var(--pb-space-1);
+.sidebar__collapse {
   margin-left: auto;
-}
-
-.app-nav__item {
-  border: 1px solid rgb(255 255 255 / 22%);
-  background: transparent;
-  color: rgb(255 255 255 / 78%);
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
   border-radius: var(--pb-radius-sm);
-  padding: 5px 10px;
-  font: inherit;
-  font-size: 12px;
-  cursor: not-allowed;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  background: transparent;
+  color: var(--pb-ink-subtle);
+  cursor: pointer;
+  transition: color var(--pb-dur-fast) var(--pb-ease-out), background var(--pb-dur-fast) var(--pb-ease-out);
 }
 
-.app-nav__item[aria-current="page"] {
-  background: rgb(255 255 255 / 14%);
-  border-color: rgb(255 255 255 / 45%);
-  color: #fff;
-  font-weight: 600;
-  cursor: default;
+.sidebar__collapse:hover {
+  background: var(--pb-surface-alt);
+  color: var(--pb-ink);
 }
 
-.app-nav__item small {
-  font-size: 10px;
-  opacity: 0.65;
+.sidebar[data-collapsed="true"] .sidebar__collapse svg {
+  transform: rotate(180deg);
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar__section {
+  margin: var(--pb-space-3) 0 var(--pb-space-1);
+  padding: 0 var(--pb-space-2);
+  font-size: var(--pb-text-xs);
+  font-weight: var(--pb-weight-medium);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: var(--pb-ink-subtle);
 }
 
-.app-nav__item--link {
+/* One item shape for links, the current page and the disabled planned rows. */
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--pb-space-2);
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--pb-space-2);
+  border: 0;
+  border-radius: var(--pb-radius-sm);
+  background: transparent;
+  color: var(--pb-ink-muted);
+  font: inherit;
+  font-size: var(--pb-text-sm);
+  text-align: left;
+  transition: background var(--pb-dur-fast) var(--pb-ease-out), color var(--pb-dur-fast) var(--pb-ease-out);
+}
+
+.sidebar__item--link {
   cursor: pointer;
 }
 
-.app-nav__item--link:hover {
-  background: rgb(255 255 255 / 10%);
-  color: #fff;
+.sidebar__item--link:hover {
+  background: var(--pb-surface-alt);
+  color: var(--pb-ink);
 }
 
-.app-nav__item--link:focus-visible {
-  outline: 2px solid #7dd3c8;
-  outline-offset: 1px;
+.sidebar__item[aria-current="page"] {
+  background: var(--pb-accent-soft);
+  color: var(--pb-accent);
+  font-weight: var(--pb-weight-medium);
+}
+
+.sidebar__item--planned {
+  color: var(--pb-ink-subtle);
+  cursor: not-allowed;
+}
+
+.sidebar__item:focus-visible,
+.sidebar__toggle:focus-visible,
+.sidebar__collapse:focus-visible {
+  outline: none;
+  box-shadow: var(--pb-ring);
+}
+
+.sidebar__icon {
+  flex: none;
+}
+
+.sidebar__foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pb-space-2);
+  align-items: flex-start;
+  border-top: 1px solid var(--pb-border);
+  padding-top: var(--pb-space-3);
+}
+
+.sidebar__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--pb-space-2);
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--pb-space-2);
+  border: 0;
+  border-radius: var(--pb-radius-sm);
+  background: transparent;
+  color: var(--pb-ink-muted);
+  font: inherit;
+  font-size: var(--pb-text-sm);
+  cursor: pointer;
+  transition: background var(--pb-dur-fast) var(--pb-ease-out), color var(--pb-dur-fast) var(--pb-ease-out);
+}
+
+.sidebar__toggle:hover {
+  background: var(--pb-surface-alt);
+  color: var(--pb-ink);
+}
+
+.sidebar__label-when-collapsed {
+  display: none;
+}
+
+/*
+ * Collapsed: labels are clipped rather than removed, so the button keeps its accessible name and its
+ * text stays in the DOM (a test or a screen reader still finds "Managerial dashboard").
+ */
+.sidebar[data-collapsed="true"] {
+  width: 56px;
+}
+
+.sidebar[data-collapsed="true"] .sidebar__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sidebar[data-collapsed="true"] .sidebar__label-when-collapsed {
+  display: inline;
+}
+
+.sidebar[data-collapsed="true"] .sidebar__item,
+.sidebar[data-collapsed="true"] .sidebar__toggle,
+.sidebar[data-collapsed="true"] .sidebar__head {
+  justify-content: center;
+}
+
+.sidebar[data-collapsed="true"] .sidebar__collapse,
+.sidebar[data-collapsed="true"] .sidebar__section {
+  display: none;
 }
 
 /* ── Layout ─────────────────────────────────────────────────────────── */
 .app-main {
-  flex: 1;
-  padding: var(--pb-space-5);
+  min-width: 0;
+  padding: var(--pb-space-5) var(--pb-space-6);
   display: grid;
   gap: var(--pb-space-5);
   grid-template-columns: minmax(0, 1fr);
+  align-content: start;
 }
 
 .app-main--with-drawer {

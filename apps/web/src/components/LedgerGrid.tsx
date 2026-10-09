@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import type { LedgerLine } from "../../../../packages/contracts/api";
 import { formatAmount, formatSignedCents } from "../format";
-import { paybackGridTheme } from "../gridTheme";
+import { useGridTheme } from "../gridTheme";
 import { groupByAccount, rowNetCents, type AccountGroup } from "../data/ledger";
 
 /** A fixture line plus the stable row id AG Grid needs (fixture line ids alone are not unique). */
@@ -104,6 +104,7 @@ interface AccountGroupGridProps {
 }
 
 function AccountGroupGrid({ group, loading, onDrillThrough }: AccountGroupGridProps) {
+  const gridTheme = useGridTheme();
   const [expanded, setExpanded] = useState(true);
   const gridId = `ledger-grid-${group.account_code}`;
 
@@ -159,7 +160,7 @@ function AccountGroupGrid({ group, loading, onDrillThrough }: AccountGroupGridPr
       {expanded ? (
         <div className="grid-host" id={gridId}>
           <AgGridReact<GridRow>
-            theme={paybackGridTheme}
+            theme={gridTheme}
             columnDefs={COLUMN_DEFS}
             rowData={rows}
             pinnedBottomRowData={pinnedBottomRowData}

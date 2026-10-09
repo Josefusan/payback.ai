@@ -20,6 +20,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    // Renders one AG Grid per account (and one for the P&L), and AG Grid does real layout work in jsdom:
+    // a single grid mount measures 1.4-3.4s here. The 5s default left almost no headroom, so those two
+    // tests failed intermittently under parallel load — a timeout, never a wrong assertion. 20s is a
+    // ceiling for a genuinely slow renderer, not a licence to write slow tests.
+    testTimeout: 20000,
     css: false,
     restoreMocks: true,
   },

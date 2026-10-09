@@ -4,7 +4,7 @@ import { useMemo } from "react";
 
 import type { PnLByProduct, ProductLinePnL } from "../data/reports";
 import { formatCents, formatPercent, formatSignedCents } from "../format";
-import { paybackGridTheme } from "../gridTheme";
+import { useGridTheme } from "../gridTheme";
 import type { AgWidgetDefinition, FormatShape } from "../widgets";
 
 const MODULES = [AllCommunityModule];
@@ -123,6 +123,7 @@ export function PnLByProductLine({ pnl }: { pnl: PnLByProduct }) {
     () => (pnl.lines.length > 0 ? [totalRow(pnl)] : []),
     [pnl],
   );
+  const gridTheme = useGridTheme();
 
   return (
     <section className="widget widget--pnl" aria-labelledby="pnl-heading" data-testid="pnl-widget">
@@ -152,7 +153,7 @@ export function PnLByProductLine({ pnl }: { pnl: PnLByProduct }) {
           <AgGridProvider modules={MODULES}>
             <div className="grid-host">
               <AgGridReact<PnlGridRow>
-                theme={paybackGridTheme}
+                theme={gridTheme}
                 columnDefs={COLUMN_DEFS}
                 rowData={rows}
                 pinnedBottomRowData={pinnedBottomRowData}

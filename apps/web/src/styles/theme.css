@@ -1,12 +1,119 @@
 /*
- * Payback.ai brand tokens (L4). Single source of truth for colour, type and spacing.
- * AG Grid cannot resolve CSS custom properties inside its colour maths, so the same hex
- * values are mirrored literally in src/gridTheme.ts — keep the two files in step.
+ * Payback.ai design tokens — the single source of truth for colour, type, space, radius and motion.
+ *
+ * Structure: `:root` is the DARK theme (the primary look, and the one the pitch film shows).
+ * `:root[data-theme="light"]` overrides the same names, so every component is theme-agnostic and no
+ * stylesheet ever branches on the theme itself.
+ *
+ * Backwards compatibility: the original `--pb-*` names are all preserved, so the existing component CSS
+ * keeps working while screens are rebuilt one at a time. Only the *values* changed. New tokens are added
+ * alongside; nothing was renamed.
+ *
+ * AG Grid resolves colours numerically and cannot read `var(--pb-*)`, so src/gridTheme.ts mirrors the hexes
+ * literally. Keep the two in step — that is the one duplication this system still tolerates.
  */
 :root {
-  --pb-bg: #f6f8fb;
+  color-scheme: dark;
+
+  /* ── Neutral scale ────────────────────────────────────────────────────────────────
+   * Neutrals first, colour second: colour carries meaning here, never decoration. */
+  --pb-bg: #07060f;               /* app background, the film's near-black violet */
+  --pb-surface: #101018;          /* panels */
+  --pb-surface-alt: #16161f;      /* inset rows, table zebra, code chips */
+  --pb-surface-raised: #1c1c27;   /* menus, popovers, hovered rows */
+  --pb-ink: #ececf2;              /* off-white, never pure white */
+  --pb-ink-muted: #a0a0b0;
+  --pb-ink-subtle: #6e6e80;
+  --pb-border: #23232f;           /* thin borders, not heavy shadows */
+  --pb-border-strong: #33333f;
+
+  /* ── Surfaces that were brand-coloured in the light theme ─────────────────────── */
+  --pb-navy: #0d0d16;             /* the sidebar/header plane, one step off the app bg */
+  --pb-navy-soft: #16161f;
+
+  /* ── Accent: one confident colour, used sparingly ──────────────────────────────── */
+  --pb-accent: #2dd4bf;
+  --pb-accent-strong: #14b8a6;
+  --pb-accent-soft: rgb(45 212 191 / 14%);
+  --pb-violet: #8b5cf6;
+  --pb-blue: #3b82f6;
+  --pb-grad: linear-gradient(90deg, #8b5cf6, #3b82f6, #2dd4bf);
+  --pb-gold: #fbbf24;             /* truth / simulation labels only */
+
+  /* ── Accounting semantics — colour is always paired with a sign or a label ─────── */
+  --pb-debit: #2dd4bf;
+  --pb-credit: #fbbf24;
+  --pb-positive: #34d399;
+  --pb-positive-soft: rgb(52 211 153 / 14%);
+  --pb-negative: #f87171;
+  --pb-negative-soft: rgb(248 113 113 / 14%);
+  --pb-warn: #fbbf24;
+  --pb-warn-soft: rgb(251 191 36 / 14%);
+  --pb-info: #60a5fa;
+  --pb-info-soft: rgb(96 165 250 / 14%);
+
+  /* ── Type: one family, six sizes, hierarchy from weight and colour ─────────────── */
+  --pb-font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --pb-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --pb-text-xs: 12px;             /* badges, provenance, mono chips */
+  --pb-text-sm: 14px;             /* dense tabular data — the one deliberate step below body */
+  --pb-text-base: 16px;           /* body text */
+  --pb-text-lg: 20px;             /* panel titles */
+  --pb-text-xl: 26px;             /* page titles */
+  --pb-text-2xl: 34px;            /* KPI values */
+
+  --pb-weight-normal: 400;
+  --pb-weight-medium: 500;
+  --pb-weight-semibold: 600;
+  --pb-tracking-tight: -0.011em;
+
+  --pb-leading-tight: 1.25;
+  --pb-leading: 1.5;
+
+  /* ── Space: one 4px scale, used everywhere ─────────────────────────────────────── */
+  --pb-space-1: 4px;
+  --pb-space-2: 8px;
+  --pb-space-3: 12px;
+  --pb-space-4: 16px;
+  --pb-space-5: 24px;
+  --pb-space-6: 32px;
+  --pb-space-7: 48px;
+  --pb-space-8: 64px;
+
+  /* ── Radius and elevation: small and consistent, borders before shadows ─────────── */
+  --pb-radius-sm: 6px;
+  --pb-radius: 10px;
+  --pb-radius-lg: 14px;
+
+  --pb-shadow-sm: 0 1px 2px rgb(0 0 0 / 24%);
+  --pb-shadow: 0 8px 24px rgb(0 0 0 / 32%);
+  --pb-ring: 0 0 0 2px var(--pb-bg), 0 0 0 4px var(--pb-accent);
+
+  /* ── Motion: only transform and opacity; nothing functional over 400ms ─────────── */
+  --pb-dur-fast: 120ms;           /* hover, press, toggle */
+  --pb-dur-base: 200ms;           /* dropdowns, tooltips, small panels */
+  --pb-dur-slow: 300ms;           /* drawers, modals */
+  --pb-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);   /* entering */
+  --pb-ease-in: cubic-bezier(0.4, 0, 1, 1);        /* leaving */
+  --pb-ease-inout: cubic-bezier(0.4, 0, 0.2, 1);   /* on-screen movement */
+
+  /* ── Layout ───────────────────────────────────────────────────────────────────── */
+  --pb-sidebar-w: 232px;
+  --pb-topbar-h: 56px;
+}
+
+/*
+ * Light theme. Same names, same structure — so nothing downstream branches on the theme. Values here are
+ * the original light palette, tightened to the same neutral/one-accent discipline.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --pb-bg: #f7f8fa;
   --pb-surface: #ffffff;
-  --pb-surface-alt: #f8fafc;
+  --pb-surface-alt: #f4f6f9;
+  --pb-surface-raised: #ffffff;
   --pb-ink: #0f172a;
   --pb-ink-muted: #5b6b7f;
   --pb-ink-subtle: #8494a8;
@@ -15,9 +122,14 @@
 
   --pb-navy: #0b2545;
   --pb-navy-soft: #13315c;
+
   --pb-accent: #0f766e;
   --pb-accent-strong: #115e59;
   --pb-accent-soft: #ccfbf1;
+  --pb-violet: #6d28d9;
+  --pb-blue: #2563eb;
+  --pb-grad: linear-gradient(90deg, #6d28d9, #2563eb, #0f766e);
+  --pb-gold: #b45309;
 
   --pb-debit: #0f766e;
   --pb-credit: #b45309;
@@ -25,20 +137,26 @@
   --pb-positive-soft: #dcfce7;
   --pb-negative: #b91c1c;
   --pb-negative-soft: #fee2e2;
+  --pb-warn: #b45309;
+  --pb-warn-soft: #fef3c7;
+  --pb-info: #1d4ed8;
+  --pb-info-soft: #dbeafe;
 
-  --pb-radius-sm: 6px;
-  --pb-radius: 10px;
-  --pb-radius-lg: 14px;
   --pb-shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
   --pb-shadow: 0 6px 18px rgb(15 23 42 / 8%);
+  --pb-ring: 0 0 0 2px var(--pb-surface), 0 0 0 4px var(--pb-accent);
+}
 
-  --pb-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --pb-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+/* Dark is the product default, applied unconditionally — the pitch film is shot in it. Light is opt-in via
+ * the sidebar toggle, so it is `[data-theme="light"]` and never an OS media query: honouring
+ * `prefers-color-scheme` here would paint a light first frame for anyone whose OS is light, and the grid
+ * cannot re-theme mid-paint. */
 
-  --pb-space-1: 4px;
-  --pb-space-2: 8px;
-  --pb-space-3: 12px;
-  --pb-space-4: 16px;
-  --pb-space-5: 24px;
-  --pb-space-6: 32px;
+/* Nothing animates for someone who asked it not to. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --pb-dur-fast: 1ms;
+    --pb-dur-base: 1ms;
+    --pb-dur-slow: 1ms;
+  }
 }
