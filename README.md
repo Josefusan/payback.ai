@@ -97,17 +97,18 @@ The last line of the trail reads *"PayPal payout executed as PKMU7VDGVCP8Q (appr
 moved, a named human authorized it, and the chain records both — which is the whole argument for letting an
 agent near a business's books.
 
-## How PayPal and AI are used
+## Tools used — how PayPal and AI are used
 
 | Capability | Used for | Status |
 |---|---|---|
-| Transaction Search | Ledger ingestion | **working** — real sandbox captures booked |
+| Transaction Search | Ledger ingestion + backfill | **working** — real sandbox captures booked |
 | Balances | Reconciliation + opening balance | **working** — tie-out reaches `ok true` |
-| Webhooks (signature-verified, deduped) | Real-time updates | verified live; recorded then dropped (see above) |
+| Webhooks (signature-verified, deduped) | Real-time booking | **working** — a capture books in seconds, not hours |
+| Orders v2 | Reading the buyer's own text for a capture | **working** — an extra GET that the injection guard depends on |
 | Workers AI — Clef / clef-flash | Decisions, incl. injection detection | **working** — live decision at p=0.966 |
 | Invoicing v2 | AR reminders | client + approval route built; **no action has executed yet** |
 | Payouts | Paying approved vendor bills | **working** — a real payout executed after human approval (`PKMU7VDGVCP8Q`) |
-| Refunds | Returning a customer's payment | **working** as a gate: policy blocks over the cap before PayPal is called |
+| Refunds | Returning a customer's payment | **working** — mapped from webhooks; policy blocks over the cap before PayPal is called |
 | Disputes | Dispute triage | client + approval route built; **nothing executed** |
 | AG Grid | Ledger grid, review queue, drill-through | **working** — reads the live Worker |
 
@@ -136,25 +137,47 @@ reversal entry, never an edit. Approving a contested item records a named human 
 
 We only document what works, so here is the other half of the ledger.
 
-Cut deliberately, not missed: an **autonomy dial** (`GET|PUT /api/settings/auto_post_threshold`, and the
-`GET /api/confidence/sweep` behind it). The threshold is a deployment setting (`AUTO_POST_THRESHOLD` in
-`wrangler.jsonc`), not something a controller can turn at runtime. Materiality is enforced by fixed policy
-caps and the confidence gate, and we would rather say that than show a dial that does not turn. Those two
-endpoints **return 404 today**.
-
 Still unfinished, with the reason:
 
 - **The `Sync` and `Agent actions` screens.** Both are listed as *planned* in the dashboard nav and are
   deliberately not selectable. Sync runs on an hourly cron and via `POST /api/sync`; actions run through
   `POST /api/actions/propose`.
-- **Webhook events are verified and deduped, then dropped.** `handleSyncBatch` carries a
-  `// TODO: webhook events → map resource to transaction`, so a payment booking waits for the next
-  Transaction Search sync (PayPal's search index lags captures by roughly three hours) instead of
-  booking on the webhook. This is the single biggest remaining engineering gap.
 - **Only refunds and payouts have executed.** Invoice reminders and dispute triage have clients and an
   approval route, but nothing has run them; `GET /api/actions` shows exactly what has.
-- **Managerial reporting is P&L by product line, AR aging and reconciliation — not the full set.** No
-  budget-vs-actual variance, no cash forecast, no dimensions beyond product line.
+- **No cash-flow or working-capital view.** The tie-out proves the hard half (PayPal's balance against the
+  ledger), but opening cash, cash in/out and closing position are not presented as their own report.
+- **Dimensions stop at product line.** Management accounting wants customer, vendor, project and period on
+  the lines; only `product_line` and `counterparty` exist today.
+- **Budgets are seeded, not entered.** `GET /api/reports/budget-variance` is real and computed from the
+  ledger, but there is no screen for entering next month's plan — the demo company's budgets ship in
+  `migrations/0005_budgets.sql`.
+
+## Architecture
+
+One Cloudflare Worker serves both the dashboard and its API, so there is no CORS to configure and no
+second host to keep alive. D1 is the ledger; a Queue decouples ingestion from decisions so a slow model
+call cannot stall a webhook.
+
+```mermaid
+flowchart LR
+  PP[PayPal sandbox] -->|webhook, signature-verified| W[Worker]
+  PP -->|hourly cron + POST /api/sync| W
+  W -->|record event| D1[(D1: ledger,<br/>audit chain, queue tables)]
+  W -->|enqueue| Q[[Queue: payback-sync]]
+  Q --> P[Pipeline]
+  P -->|untrusted text, quoted| C[Workers AI: Clef]
+  C -->|account, product line,<br/>needs_review, injection| G{Gate}
+  G -->|confident| L[Post balanced journal]
+  G -->|not confident, or<br/>possible injection| R[Review queue]
+  L --> D1
+  R -->|human approves or overrides| L
+  L -->|hash-chained row| A[Audit log]
+  D1 --> W2[Dashboard<br/>ledger, review, managerial, audit]
+```
+
+The two arrows worth following are the ones that make it a control rather than a demo: everything a
+counterparty can influence reaches Clef quoted as untrusted text, and nothing posts without a balanced
+journal entry plus its audit row in the same transaction.
 
 
 ## Run it
@@ -222,7 +245,10 @@ Every id it creates is appended to `docs/sandbox-activity.md`.
 
 ## Demo video
 
-_TODO: YouTube link._
+PLACEHOLDER — not uploaded yet. The link and the YouTube URL in `submission/video.json` are filled in when
+the recording is published. (This line says PLACEHOLDER on purpose: the rules-compliance gate in
+`evals/checks.py` keys on that literal word, and it previously reported a passing video against a `_TODO_`
+that no video backed. An unearned green tick is worse than an honest pending one.)
 
 ## Repository map
 

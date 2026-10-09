@@ -6,10 +6,14 @@ Judges see only what real judges see: README, Devpost text, video transcript/pla
 a file tree and key code excerpts, plus the deterministic checks report.
 
 Usage:
-    export ANTHROPIC_API_KEY=...            # never commit
-    export JUDGE_MODEL=claude-sonnet-4-5    # any current Claude model id
+    export ANTHROPIC_API_KEY=...            # never commit — the original judge provider
+    export DEEPSEEK_API_KEY=...             # or judge on DeepSeek (OpenAI-compatible)
+    export JUDGE_MODEL=...                  # optional; each provider has its own default
     python evals/checks.py                  # produces evals/out/checks.json (input to the judge)
-    python evals/llm_judge.py [--stage 1] [--personas paypal_devrel,paypal_product] [--strict] [--dry-run]
+    python evals/llm_judge.py [--stage 1] [--provider deepseek] [--personas ...] [--strict] [--dry-run]
+
+Whichever key is present is used; `--provider` overrides. `judge.json` records both the provider and the
+model, because which model judged is part of what the artifact is evidence for.
 
 Outputs evals/out/judge.json and evals/out/judge.md. With --strict, exits 1 if below thresholds.
 Stdlib only.
@@ -104,7 +108,7 @@ Return ONLY a JSON object, no prose, matching:
     return system, user
 
 
-def call_claude(system: str, user: str, model: str) -> str:
+def call_anthropic(system: str, user: str, model: str) -> str:
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         sys.exit("ANTHROPIC_API_KEY is not set (export it in your shell; never commit it).")
@@ -117,11 +121,100 @@ def call_claude(system: str, user: str, model: str) -> str:
     return "".join(b.get("text", "") for b in data.get("content", []))
 
 
-def parse_json(text: str) -> dict:
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m:
+def call_deepseek(system: str, user: str, model: str) -> str:
+    """
+    Any OpenAI-compatible /chat/completions endpoint. Defaults to DeepSeek's.
+
+    The budget is large on purpose: DeepSeek reasons before answering and reasoning bills as output tokens,
+    so a limit sized for the JSON alone truncates the reply mid-object. A truncated reply is worse than a
+    failed call — it looks like a parser bug.
+    """
+    key = os.environ.get("DEEPSEEK_API_KEY")
+    if not key:
+        sys.exit("DEEPSEEK_API_KEY is not set (export it in your shell; never commit it).")
+    base = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
+    limit = int(os.environ.get("JUDGE_MAX_TOKENS", "16000"))
+    body = json.dumps({"model": model, "temperature": 0, "max_tokens": limit,
+                       "messages": [{"role": "system", "content": system},
+                                    {"role": "user", "content": user}]}).encode()
+    req = urllib.request.Request(f"{base}/chat/completions", data=body, method="POST", headers={
+        "authorization": f"Bearer {key}", "content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        data = json.loads(resp.read())
+    choice = data["choices"][0]
+    if choice.get("finish_reason") == "length":
+        print(f"[warn] {model} hit the {limit}-token ceiling; the reply is truncated. "
+              f"Raise JUDGE_MAX_TOKENS.", file=sys.stderr)
+    return choice["message"]["content"]
+
+
+PROVIDERS = {"anthropic": (call_anthropic, "ANTHROPIC_API_KEY", "claude-sonnet-4-5"),
+             # deepseek-chat is retired; deepseek-flash is the current 1M-context model.
+             "deepseek": (call_deepseek, "DEEPSEEK_API_KEY", "deepseek-flash")}
+
+
+def pick_provider(explicit: str | None) -> str:
+    """
+    Which provider to judge with. Explicit wins; otherwise whichever key is present.
+
+    The judge is the submission's own evidence about itself, so what matters is that a real model actually
+    produced it and that the artifact says which one. Anthropic stays the default where a key exists
+    because the rubric was written against its behaviour, but the harness must not be un-runnable just
+    because that one key is missing — an unrunnable check is not evidence either.
+    """
+    if explicit:
+        return explicit
+    for name, (_fn, env_key, _model) in PROVIDERS.items():
+        if os.environ.get(env_key):
+            return name
+    sys.exit("no judge key set: export ANTHROPIC_API_KEY or DEEPSEEK_API_KEY (never commit either).")
+
+
+def call_model(system: str, user: str, model: str, provider: str) -> str:
+    return PROVIDERS[provider][0](system, user, model)
+
+
+def extract_json_object(text: str) -> str:
+    """
+    Pull the first balanced JSON object out of a model response.
+
+    The original `re.search(r"\\{.*\\}", text, re.S)` was greedy: it ran from the first `{` to the last
+    `}`, so a fenced block followed by any prose containing a brace — or simply more than one object in the
+    reply — produced a string that was not JSON. It happened to work against one provider's formatting and
+    failed the moment another was used, which is a poor basis for the submission's own evidence.
+
+    This scans characters, tracking string state and escapes, so it returns exactly the first complete
+    object and ignores anything after it.
+    """
+    start = text.find("{")
+    if start == -1:
         raise ValueError("no JSON object in judge output")
-    return json.loads(m.group(0))
+    depth = 0
+    in_string = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    raise ValueError("unterminated JSON object in judge output")
+
+
+def parse_json(text: str) -> dict:
+    return json.loads(extract_json_object(text))
 
 
 def aggregate(verdicts: list[dict], stage: str) -> dict:
@@ -173,10 +266,15 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", choices=["1", "2"], default="2", help="1 = gates only; 2 = gates + criteria")
     ap.add_argument("--personas", help="comma-separated persona ids (default: all)")
-    ap.add_argument("--model", default=os.environ.get("JUDGE_MODEL", "claude-sonnet-4-5"))
+    ap.add_argument("--provider", choices=sorted(PROVIDERS), help="judge provider (default: whichever key is set)")
+    ap.add_argument("--model", default=os.environ.get("JUDGE_MODEL"))
     ap.add_argument("--strict", action="store_true", help="exit 1 if thresholds not met")
     ap.add_argument("--dry-run", action="store_true", help="print the first prompt and exit")
     args = ap.parse_args()
+
+    provider = pick_provider(args.provider)
+    model = args.model or PROVIDERS[provider][2]
+    print(f"judge provider: {provider} ({model})", file=sys.stderr)
 
     personas = RUBRIC["personas"]
     if args.personas:
@@ -191,19 +289,22 @@ def main() -> int:
     verdicts = []
     for p in personas:
         s, u = build_prompt(p, args.stage)
-        raw = call_claude(s, u, args.model)
+        raw = call_model(s, u, model, provider)
         try:
             v = parse_json(raw)
         except Exception as e:
             print(f"[warn] {p['id']}: could not parse judge output ({e}); retrying once", file=sys.stderr)
-            v = parse_json(call_claude(s, u + "\n\nReturn ONLY valid JSON.", args.model))
+            v = parse_json(call_model(s, u + "\n\nReturn ONLY valid JSON.", model, provider))
         v["persona"] = p["id"]
         verdicts.append(v)
         print(f"judged by {p['id']}", file=sys.stderr)
 
     agg = aggregate(verdicts, args.stage)
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "judge.json").write_text(json.dumps({"model": args.model, "aggregate": agg, "verdicts": verdicts}, indent=2))
+    # The provider and model are recorded, not just the model: which model judged is part of what the
+    # artifact is evidence FOR, and "claude" vs "deepseek" changes how much weight a reader should give it.
+    (OUT / "judge.json").write_text(json.dumps(
+        {"provider": provider, "model": model, "aggregate": agg, "verdicts": verdicts}, indent=2))
     md = to_markdown(agg, verdicts)
     (OUT / "judge.md").write_text(md)
     print(md)
