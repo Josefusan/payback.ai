@@ -55,6 +55,19 @@ the refund; `ledgerCents` must equal PayPal's `total_balance` with `pendingCents
 sandbox funds: the balance stayed 5,000.00 after three net-positive captures) should surface as a
 reconciliation *reason*, not silently. A management accountant needs to see held funds as held.
 
+**1.5 Build the hash-chained audit trail.** *Does not exist (see §2.7).* Add `audit_log` (seq, ref_type,
+ref_id, actor, detail_json, prev_hash, hash, created_at) as `0003_audit.sql`; append from every mutation —
+`postEntry`, `reverseEntry`, review resolve, action approve, settings change — with
+`hash = sha256(prev_hash ‖ canonical(row))`; expose `GET /api/audit` (`{events, story}`) and
+`GET /api/audit/verify` (`{ok, broken_at_seq}`); surface it in the dashboard with the verify result. A test
+must prove tampering is *detected*, not merely that the chain is written.
+
+**1.6 Build the autonomy dial.** *Does not exist (see §2.7).* Store the threshold in D1, expose
+`GET|PUT /api/settings/auto_post_threshold` (the contract already declares it; clamp to [0.80, 0.99]),
+have the decision path read it instead of the `AUTO_POST_THRESHOLD` var, write a settings change to the
+audit log (1.5), and add `GET /api/confidence/sweep` plus the `ConfidenceDial` widget. This is the
+difference between "the agent posts things" and "the controller decides what it may post alone".
+
 ---
 
 ## 2. Make it work for a managerial accounting department
@@ -84,13 +97,23 @@ plus AR and AP positions. The tie-out already proves the hard half.
 **2.6 Close checklist.** `/api/close` already exists in the contract. Drive it from real checks: reconcile
 exact, no unresolved review items, no unposted settled transactions, AR aged, thresholds reviewed.
 
-**2.7 Controls a controller will look for** — these already exist and should be showcased, not built:
-- **Append-only ledger** enforced by SQLite triggers; corrections are reversals, never updates.
-- **Hash-chained audit log** (`/api/audit`, `/api/audit/verify`) — tamper-evident history.
-- **Autonomy dial** (`/api/settings/auto_post_threshold` + confidence sweep): materiality, made explicit. A
-  management accountant's core question is "what may the system post without me?", and this answers it in
-  numbers.
+**2.7 Controls a controller will look for.** Two of these exist and should be *showcased*; two do **not
+exist** and must be built — corrected 2026-10-09 after finding they were claimed here and in the README
+without any backing code:
+
+*Exist today:*
+- **Append-only ledger** enforced by SQLite triggers (`migrations/0002_journal_approver.sql`); corrections
+  are reversals, never updates.
 - **Two keys for money movement** (INV-4) and deterministic policy caps no model can override (INV-3/policy).
+
+*Do NOT exist — build in §1.5 / §1.6 before the video promises them:*
+- **Hash-chained audit log** (`/api/audit`, `/api/audit/verify`). `routes/audit.ts` registers no route, both
+  endpoints 404, and there is no `audit_log` table. The planned `0002_audit.sql` was never written.
+- **Autonomy dial** (`/api/settings/auto_post_threshold` + confidence sweep). The endpoint 404s and no
+  source file references it; the threshold is the static `AUTO_POST_THRESHOLD` var.
+
+⚠️ **§6 steps 4 and 5 currently depend on both.** They cannot be recorded as written. Either build §1.5 and
+§1.6 first, or rewrite those beats — do not put them on camera in this state.
 
 Positioning line for the submission: *the agent does the bookkeeping; the dial and the audit trail are what
 make a controller willing to let it.*
