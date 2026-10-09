@@ -24,42 +24,42 @@ const SHARED = {
   pinnedRowFontWeight: 600,
 } as const;
 
-/** The primary (dark) grid: near-black panel, off-white text, one teal accent. */
+/** The primary (dark) grid. Every colour below names the token it mirrors. */
 export const paybackGridTheme = themeQuartz.withPart(colorSchemeDark).withParams({
   ...SHARED,
-  accentColor: "#2dd4bf",
-  backgroundColor: "#101018",
-  foregroundColor: "#ececf2",
-  borderColor: "#23232f",
-  chromeBackgroundColor: "#16161f",
-  headerBackgroundColor: "#16161f",
-  headerTextColor: "#a0a0b0",
-  oddRowBackgroundColor: "#131320",
-  rowHoverColor: "#1c1c27",
-  selectedRowBackgroundColor: "rgba(45, 212, 191, 0.16)",
-  subtleTextColor: "#6e6e80",
-  pinnedRowBackgroundColor: "#16161f",
-  pinnedRowTextColor: "#ececf2",
-  cellTextColor: "#ececf2",
+  accentColor: "#2dd4bf", // --pb-accent
+  backgroundColor: "#101018", // --pb-surface
+  foregroundColor: "#ececf2", // --pb-ink
+  borderColor: "#23232f", // --pb-border
+  chromeBackgroundColor: "#16161f", // --pb-surface-alt
+  headerBackgroundColor: "#16161f", // --pb-surface-alt
+  headerTextColor: "#a0a0b0", // --pb-ink-muted
+  oddRowBackgroundColor: "#16161f", // --pb-surface-alt
+  rowHoverColor: "#1c1c27", // --pb-surface-raised
+  selectedRowBackgroundColor: "rgba(45, 212, 191, 0.16)", // --pb-accent-soft, nudged to 16% so a selection is legible
+  subtleTextColor: "#85859a", // --pb-ink-subtle
+  pinnedRowBackgroundColor: "#16161f", // --pb-surface-alt
+  pinnedRowTextColor: "#ececf2", // --pb-ink
+  cellTextColor: "#ececf2", // --pb-ink
 });
 
 /** The light grid — same structure, same accent role, light neutrals. */
 export const paybackGridThemeLight = themeQuartz.withPart(colorSchemeLight).withParams({
   ...SHARED,
-  accentColor: "#0f766e",
-  backgroundColor: "#ffffff",
-  foregroundColor: "#0f172a",
-  borderColor: "#e3e8ef",
-  chromeBackgroundColor: "#f1f5f9",
-  headerBackgroundColor: "#f1f5f9",
-  headerTextColor: "#5b6b7f",
-  oddRowBackgroundColor: "#fbfdff",
-  rowHoverColor: "#f0fdfa",
-  selectedRowBackgroundColor: "#ccfbf1",
-  subtleTextColor: "#8494a8",
-  pinnedRowBackgroundColor: "#f1f5f9",
-  pinnedRowTextColor: "#0f172a",
-  cellTextColor: "#0f172a",
+  accentColor: "#0f766e", // --pb-accent
+  backgroundColor: "#ffffff", // --pb-surface
+  foregroundColor: "#0f172a", // --pb-ink
+  borderColor: "#e3e8ef", // --pb-border
+  chromeBackgroundColor: "#f4f6f9", // --pb-surface-alt
+  headerBackgroundColor: "#f4f6f9", // --pb-surface-alt
+  headerTextColor: "#5b6b7f", // --pb-ink-muted
+  oddRowBackgroundColor: "#f4f6f9", // --pb-surface-alt
+  rowHoverColor: "#ccfbf1", // --pb-accent-soft
+  selectedRowBackgroundColor: "#ccfbf1", // --pb-accent-soft
+  subtleTextColor: "#5f6d80", // --pb-ink-subtle
+  pinnedRowBackgroundColor: "#f4f6f9", // --pb-surface-alt
+  pinnedRowTextColor: "#0f172a", // --pb-ink
+  cellTextColor: "#0f172a", // --pb-ink
 });
 
 export type ThemeMode = "dark" | "light";

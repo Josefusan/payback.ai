@@ -19,6 +19,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Buttons do not inherit the page font by default — an unstyled one renders in the UA font (13.33px Arial in
+ * Chrome). That is how `.row-drill` ended up at 13.33px, off the type scale, and its missing background let
+ * the UA's grey ButtonFace show through behind teal text for a 2.86:1 contrast failure.
+ */
+button {
+  font: inherit;
+}
+
 .app {
   min-height: 100dvh;
   display: grid;
@@ -71,7 +80,6 @@ body {
   background: transparent;
   color: var(--pb-ink-subtle);
   cursor: pointer;
-  transition: color var(--pb-dur-fast) var(--pb-ease-out), background var(--pb-dur-fast) var(--pb-ease-out);
 }
 
 .sidebar__collapse:hover {
@@ -116,7 +124,6 @@ body {
   font: inherit;
   font-size: var(--pb-text-sm);
   text-align: left;
-  transition: background var(--pb-dur-fast) var(--pb-ease-out), color var(--pb-dur-fast) var(--pb-ease-out);
 }
 
 .sidebar__item--link {
@@ -173,7 +180,6 @@ body {
   font: inherit;
   font-size: var(--pb-text-sm);
   cursor: pointer;
-  transition: background var(--pb-dur-fast) var(--pb-ease-out), color var(--pb-dur-fast) var(--pb-ease-out);
 }
 
 .sidebar__toggle:hover {
@@ -235,53 +241,61 @@ body {
   background: var(--pb-surface);
   border: 1px solid var(--pb-border);
   border-radius: var(--pb-radius-lg);
-  box-shadow: var(--pb-shadow-sm);
-  padding: var(--pb-space-4);
+  padding: var(--pb-space-5);
   min-width: 0;
 }
 
 .panel__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--pb-space-3);
   flex-wrap: wrap;
-  margin-bottom: var(--pb-space-3);
+  margin-bottom: var(--pb-space-4);
 }
 
 .panel__title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--pb-text-lg);
+  font-weight: var(--pb-weight-semibold);
+  letter-spacing: var(--pb-tracking-tight);
+  color: var(--pb-ink);
 }
 
 .muted {
   color: var(--pb-ink-muted);
-  font-size: 12px;
+  font-size: var(--pb-text-sm);
+  line-height: var(--pb-leading);
   margin: 0;
 }
 
+/*
+ * Badges. The border is mixed from the badge's own semantic colour rather than a hardcoded pastel, so it
+ * tracks the theme instead of looking washed out on dark (the light-mode pastels were #bbf7d0/#99f6e4).
+ */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   border-radius: 999px;
-  padding: 2px 9px;
-  font-size: 11px;
-  font-weight: 600;
+  padding: 3px 10px;
+  font-size: var(--pb-text-xs);
+  font-weight: var(--pb-weight-medium);
+  line-height: 1.4;
   border: 1px solid transparent;
   white-space: nowrap;
 }
 
-.badge--sandbox {
+.badge--sandbox,
+.badge--ok {
   background: var(--pb-positive-soft);
   color: var(--pb-positive);
-  border-color: #bbf7d0;
+  border-color: color-mix(in srgb, var(--pb-positive) 38%, transparent);
 }
 
 .badge--fixture {
   background: var(--pb-accent-soft);
-  color: var(--pb-accent-strong);
-  border-color: #99f6e4;
+  color: var(--pb-accent);
+  border-color: color-mix(in srgb, var(--pb-accent) 38%, transparent);
 }
 
 .badge--live-off {
@@ -290,16 +304,10 @@ body {
   border-color: var(--pb-border-strong);
 }
 
-.badge--ok {
-  background: var(--pb-positive-soft);
-  color: var(--pb-positive);
-  border-color: #bbf7d0;
-}
-
 .badge--warn {
   background: var(--pb-negative-soft);
   color: var(--pb-negative);
-  border-color: #fecaca;
+  border-color: color-mix(in srgb, var(--pb-negative) 38%, transparent);
 }
 
 /* ── Totals rail (pinned totals) ────────────────────────────────────── */
@@ -325,7 +333,7 @@ body {
 }
 
 .totals__label {
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--pb-ink-subtle);
@@ -333,7 +341,7 @@ body {
 }
 
 .totals__value {
-  font-size: 19px;
+  font-size: var(--pb-text-lg);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -359,7 +367,7 @@ body {
 }
 
 .chart__caption {
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   color: var(--pb-ink-muted);
   margin: 0 0 var(--pb-space-2);
 }
@@ -373,7 +381,7 @@ body {
 }
 
 .chart__name {
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   color: var(--pb-ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -383,7 +391,7 @@ body {
 .chart__name code {
   color: var(--pb-ink-subtle);
   font-family: var(--pb-font-mono);
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
 }
 
 .chart__track {
@@ -406,7 +414,7 @@ body {
 }
 
 .chart__value {
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   font-variant-numeric: tabular-nums;
   text-align: right;
   color: var(--pb-ink-muted);
@@ -415,7 +423,7 @@ body {
 .chart__legend {
   display: flex;
   gap: var(--pb-space-4);
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   color: var(--pb-ink-muted);
   margin-top: var(--pb-space-2);
 }
@@ -456,7 +464,7 @@ body {
   align-items: center;
   gap: var(--pb-space-3);
   padding: var(--pb-space-2) var(--pb-space-3);
-  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  background: var(--pb-surface-alt);
   border-bottom: 1px solid var(--pb-border);
   flex-wrap: wrap;
 }
@@ -465,10 +473,11 @@ body {
   border: 1px solid var(--pb-border-strong);
   background: var(--pb-surface);
   border-radius: var(--pb-radius-sm);
-  width: 22px;
-  height: 22px;
+  /* 24px is the WCAG 2.2 AA minimum target size; this was 22x22 and measured under it. */
+  width: 24px;
+  height: 24px;
   line-height: 1;
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   cursor: pointer;
   color: var(--pb-ink-muted);
 }
@@ -480,12 +489,12 @@ body {
 
 .group__account {
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--pb-text-sm);
 }
 
 .group__account code {
   font-family: var(--pb-font-mono);
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   color: var(--pb-ink-subtle);
   margin-right: 6px;
   font-weight: 600;
@@ -499,29 +508,96 @@ body {
 }
 
 .chip {
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   font-variant-numeric: tabular-nums;
   border-radius: var(--pb-radius-sm);
-  padding: 2px 8px;
-  background: var(--pb-surface);
+  padding: 3px 8px;
+  background: var(--pb-surface-alt);
   border: 1px solid var(--pb-border);
   color: var(--pb-ink-muted);
 }
 
 .chip--debit {
   color: var(--pb-debit);
-  border-color: #99f6e4;
-  background: #f0fdfa;
+  border-color: color-mix(in srgb, var(--pb-debit) 32%, transparent);
+  background: var(--pb-accent-soft);
 }
 
 .chip--credit {
   color: var(--pb-credit);
-  border-color: #fde68a;
-  background: #fffbeb;
+  border-color: color-mix(in srgb, var(--pb-credit) 32%, transparent);
+  background: var(--pb-warn-soft);
 }
 
 .grid-host {
   width: 100%;
+}
+
+/*
+ * Loading states. A skeleton, not a blank panel: blank waits are an anti-pattern in the bylaws, and a
+ * placeholder that already has the final shape does not reflow when the data lands.
+ *
+ * The sweep loops indefinitely rather than settling, so it is an indeterminate progress indicator, not a
+ * state transition — the 400-500ms ceiling is about transitions. It animates only `transform`.
+ */
+.loading {
+  display: grid;
+  gap: var(--pb-space-2);
+  padding: var(--pb-space-2) 0;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--pb-surface-alt);
+  border-radius: var(--pb-radius-sm);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--pb-ink) 7%, transparent), transparent);
+  animation: skeleton-sweep 1.4s var(--pb-ease-inout) infinite;
+}
+
+.skeleton--title {
+  height: 20px;
+  width: 30%;
+}
+
+.skeleton--text {
+  height: 12px;
+}
+
+.skeleton--row {
+  height: 36px;
+}
+
+/* Available to assistive tech, invisible on screen. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes skeleton-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
 }
 
 .empty {
@@ -554,7 +630,7 @@ body {
 
 .drawer__title {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--pb-text-base);
 }
 
 .drawer__close {
@@ -565,7 +641,7 @@ body {
   cursor: pointer;
   padding: 2px 8px;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
 }
 
 .drawer__meta {
@@ -573,7 +649,7 @@ body {
   grid-template-columns: auto 1fr;
   gap: 2px var(--pb-space-3);
   margin: var(--pb-space-3) 0;
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
 }
 
 .drawer__meta dt {
@@ -588,7 +664,7 @@ body {
 .drawer table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   margin-top: var(--pb-space-2);
 }
 
@@ -607,7 +683,7 @@ body {
 
 .drawer thead th {
   color: var(--pb-ink-subtle);
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -616,7 +692,7 @@ body {
   margin-top: var(--pb-space-3);
   padding-top: var(--pb-space-3);
   border-top: 1px solid var(--pb-border);
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
 }
 
 .drawer__source code {
@@ -632,9 +708,20 @@ body {
 }
 
 .row-drill {
-  color: var(--pb-accent-strong);
+  background: transparent;
+  border: 0;
+  color: var(--pb-accent);
+  cursor: pointer;
   text-decoration: underline;
   text-decoration-style: dotted;
+  /* WCAG 2.2 AA target size: this measured 88x21 inside a scrollable grid cell. */
+  min-height: 24px;
+  padding: 0 var(--pb-space-1);
+  border-radius: var(--pb-radius-sm);
+}
+
+.row-drill:hover {
+  background: var(--pb-accent-soft);
 }
 
 /* ── Managerial dashboard widgets (T-L4-003) ────────────────────────── */
@@ -667,7 +754,7 @@ body {
 
 .widget__title {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--pb-text-sm);
   font-weight: 700;
 }
 
@@ -697,7 +784,7 @@ body {
 .tile__code {
   font-family: var(--pb-font-mono);
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   color: var(--pb-ink-subtle);
 }
 
@@ -709,7 +796,7 @@ body {
 }
 
 .tile__grid dt {
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--pb-ink-subtle);
@@ -718,7 +805,7 @@ body {
 
 .tile__grid dd {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--pb-text-base);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -741,7 +828,7 @@ body {
   grid-template-columns: 82px minmax(0, 1fr) 92px 64px;
   align-items: center;
   gap: var(--pb-space-2);
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
 }
 
 .aging__label {
@@ -789,7 +876,7 @@ body {
 }
 
 .kpi__label {
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--pb-ink-subtle);
@@ -797,7 +884,7 @@ body {
 }
 
 .kpi__value {
-  font-size: 19px;
+  font-size: var(--pb-text-lg);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -855,14 +942,14 @@ body {
 
 .queue__ref {
   font-family: var(--pb-font-mono);
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   color: var(--pb-ink-subtle);
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .queue__meta {
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   color: var(--pb-ink-muted);
 }
 
@@ -899,33 +986,33 @@ body {
 }
 
 .reason__label {
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   font-weight: 600;
 }
 
 .reason__raw {
   font-family: var(--pb-font-mono);
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   color: var(--pb-ink-muted);
 }
 
 .alert {
   border-radius: var(--pb-radius-sm);
   padding: var(--pb-space-2) var(--pb-space-3);
-  font-size: 12px;
+  font-size: var(--pb-text-sm);
   margin: var(--pb-space-2) 0 0;
   border: 1px solid transparent;
 }
 
 .alert--danger {
   background: var(--pb-negative-soft);
-  border-color: #fecaca;
+  border-color: color-mix(in srgb, var(--pb-negative) 38%, transparent);
   color: var(--pb-negative);
 }
 
 .alert--ok {
   background: var(--pb-positive-soft);
-  border-color: #bbf7d0;
+  border-color: color-mix(in srgb, var(--pb-positive) 38%, transparent);
   color: var(--pb-positive);
 }
 
@@ -943,7 +1030,7 @@ body {
 
 .dist__chose {
   margin: 0 0 var(--pb-space-1);
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
 }
 
 .dist__list {
@@ -959,7 +1046,7 @@ body {
   grid-template-columns: 260px minmax(0, 1fr) 56px;
   align-items: center;
   gap: var(--pb-space-2);
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   opacity: 0.7;
 }
 
@@ -1014,7 +1101,7 @@ body {
 }
 
 .field__label {
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--pb-ink-subtle);
@@ -1023,7 +1110,7 @@ body {
 
 .field__input {
   font: inherit;
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   padding: 5px 8px;
   border: 1px solid var(--pb-border-strong);
   border-radius: var(--pb-radius-sm);
@@ -1047,7 +1134,7 @@ body {
 
 .btn {
   font: inherit;
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   font-weight: 600;
   padding: 6px 14px;
   border: 1px solid var(--pb-border-strong);
@@ -1069,7 +1156,7 @@ body {
 .btn--primary {
   background: var(--pb-accent-strong);
   border-color: var(--pb-accent-strong);
-  color: #fff;
+  color: var(--pb-on-accent);
 }
 
 .btn--primary:hover:not(:disabled) {
@@ -1099,7 +1186,7 @@ body {
   border-left: 3px solid var(--pb-accent);
   background: var(--pb-surface-alt);
   border-radius: 0 var(--pb-radius-sm) var(--pb-radius-sm) 0;
-  font-size: 12.5px;
+  font-size: var(--pb-text-xs);
 }
 
 .story__line:nth-child(even) {
@@ -1108,14 +1195,14 @@ body {
 
 .story__time {
   font-family: var(--pb-font-mono);
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   color: var(--pb-ink-subtle);
 }
 
 .trail {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--pb-text-xs);
   margin-top: var(--pb-space-2);
 }
 
@@ -1129,7 +1216,7 @@ body {
 
 .trail thead th {
   color: var(--pb-ink-subtle);
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
@@ -1137,7 +1224,7 @@ body {
 
 .trail code {
   font-family: var(--pb-font-mono);
-  font-size: 11px;
+  font-size: var(--pb-text-xs);
   background: var(--pb-surface-alt);
   border: 1px solid var(--pb-border);
   border-radius: var(--pb-radius-sm);

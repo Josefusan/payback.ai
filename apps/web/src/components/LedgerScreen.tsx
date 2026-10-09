@@ -54,9 +54,13 @@ export function LedgerScreen() {
         </p>
 
         {ledger.loading ? (
-          <p className="muted" data-testid="ledger-loading">
-            Loading the ledger…
-          </p>
+          <div className="loading" data-testid="ledger-loading" role="status">
+            <span className="visually-hidden">Loading the ledger…</span>
+            <span className="skeleton skeleton--title" />
+            <span className="skeleton skeleton--row" />
+            <span className="skeleton skeleton--row" />
+            <span className="skeleton skeleton--row" />
+          </div>
         ) : (
           <>
             <TotalsBar totals={totals} source={ledger.source ?? "—"} />

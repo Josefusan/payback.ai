@@ -71,9 +71,13 @@ export function AuditScreen() {
         </p>
 
         {audit.loading && events.length === 0 ? (
-          <p className="muted" data-testid="audit-loading">
-            Reading the trail…
-          </p>
+          <div className="loading" data-testid="audit-loading" role="status">
+            <span className="visually-hidden">Reading the trail…</span>
+            <span className="skeleton skeleton--title" />
+            <span className="skeleton skeleton--text" />
+            <span className="skeleton skeleton--text" />
+            <span className="skeleton skeleton--row" />
+          </div>
         ) : events.length === 0 ? (
           <p className="empty" data-testid="audit-empty">
             Nothing recorded yet. The trail starts the first time the agent posts a journal entry or a human

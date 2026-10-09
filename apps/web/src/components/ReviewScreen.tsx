@@ -112,9 +112,13 @@ export function ReviewScreen() {
         </p>
 
         {loading ? (
-          <p className="muted" data-testid="review-loading">
-            Loading the queue…
-          </p>
+          <div className="loading" data-testid="review-loading" role="status">
+            <span className="visually-hidden">Loading the queue…</span>
+            <span className="skeleton skeleton--title" />
+            <span className="skeleton skeleton--row" />
+            <span className="skeleton skeleton--row" />
+            <span className="skeleton skeleton--row" />
+          </div>
         ) : items.length === 0 ? (
           <p className="empty" data-testid="queue-empty">
             Nothing is waiting on a human. The agent posted everything it was confident about.

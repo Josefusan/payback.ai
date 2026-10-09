@@ -23,9 +23,9 @@
   --pb-surface-raised: #1c1c27;   /* menus, popovers, hovered rows */
   --pb-ink: #ececf2;              /* off-white, never pure white */
   --pb-ink-muted: #a0a0b0;
-  --pb-ink-subtle: #6e6e80;
-  --pb-border: #23232f;           /* thin borders, not heavy shadows */
-  --pb-border-strong: #33333f;
+  --pb-ink-subtle: #85859a;       /* >= 4.5:1 on surface-alt — measured, not eyeballed */
+  --pb-border: #23232f;           /* hairline dividers — decorative, so no 3:1 requirement */
+  --pb-border-strong: #63637a;    /* interactive boundaries (inputs, buttons): >= 3:1 on surface, per WCAG 1.4.11 */
 
   /* ── Surfaces that were brand-coloured in the light theme ─────────────────────── */
   --pb-navy: #0d0d16;             /* the sidebar/header plane, one step off the app bg */
@@ -35,6 +35,7 @@
   --pb-accent: #2dd4bf;
   --pb-accent-strong: #14b8a6;
   --pb-accent-soft: rgb(45 212 191 / 14%);
+  --pb-on-accent: #05201c;        /* text on a filled accent surface — the accent is light in dark mode */
   --pb-violet: #8b5cf6;
   --pb-blue: #3b82f6;
   --pb-grad: linear-gradient(90deg, #8b5cf6, #3b82f6, #2dd4bf);
@@ -116,9 +117,9 @@
   --pb-surface-raised: #ffffff;
   --pb-ink: #0f172a;
   --pb-ink-muted: #5b6b7f;
-  --pb-ink-subtle: #8494a8;
+  --pb-ink-subtle: #5f6d80;       /* the old #8494a8 measured 3.1:1 on white and failed AA */
   --pb-border: #e3e8ef;
-  --pb-border-strong: #cbd5e1;
+  --pb-border-strong: #8494a8;    /* the old #cbd5e1 measured 1.48:1 against a panel */
 
   --pb-navy: #0b2545;
   --pb-navy-soft: #13315c;
@@ -126,6 +127,7 @@
   --pb-accent: #0f766e;
   --pb-accent-strong: #115e59;
   --pb-accent-soft: #ccfbf1;
+  --pb-on-accent: #ffffff;        /* the light-mode accent is dark, so filled buttons take white */
   --pb-violet: #6d28d9;
   --pb-blue: #2563eb;
   --pb-grad: linear-gradient(90deg, #6d28d9, #2563eb, #0f766e);
