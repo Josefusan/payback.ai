@@ -107,6 +107,13 @@ export interface PayPalTransactionDetail {
   cart_info?: { item_details?: Array<{ item_code?: string; item_name?: string; item_quantity?: string; item_amount?: Money }> };
 }
 
+/** The subset of a checkout order this worker reads. `description` is buyer-controlled. */
+export interface PayPalOrder {
+  id: string;
+  purchase_units?: Array<{ description?: string; custom_id?: string; reference_id?: string }>;
+  payer?: { email_address?: string; payer_id?: string };
+}
+
 export class PayPalError extends Error {
   constructor(public status: number, public debugId: string | undefined, public body: unknown) {
     super(`PayPal ${status}${debugId ? ` (debug_id ${debugId})` : ""}`);
@@ -323,6 +330,16 @@ export class PayPalClient {
         items: [{ recipient_type: "EMAIL", receiver: p.receiver, amount: { value: p.amount, currency: p.currency }, note: p.note, sender_item_id: p.itemId, recipient_wallet: "PAYPAL" }],
       },
     });
+  }
+
+  // ── Checkout orders ──────────────────────────────────────────────────────
+  /**
+   * Fetch a checkout order. The webhook path needs this because a capture webhook carries the amount and
+   * fee but NOT the buyer's own text — `purchase_units[0].description` is where an order's note lives, and
+   * that is the field the injection guard has to read.
+   */
+  getOrder(orderId: string) {
+    return this.request<PayPalOrder>("GET", `/v2/checkout/orders/${encodeURIComponent(orderId)}`);
   }
 
   // ── Disputes ─────────────────────────────────────────────────────────────

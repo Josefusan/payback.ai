@@ -2,7 +2,7 @@
  * The autonomous loop: PayPal → Clef decision → gate → post journal or review queue.
  */
 import type { Env, SyncMessage } from "./env";
-import { PayPalClient, type PayPalTransactionDetail } from "./paypal";
+import { PayPalClient, type PayPalOrder, type PayPalTransactionDetail } from "./paypal";
 import { decideTransaction, type TxnForDecision } from "./clef";
 import { buildJournal, buildOpeningLines, UnsupportedEventError } from "./ledger";
 import { fromCents, toCents } from "./money";
@@ -83,10 +83,33 @@ export async function processTransaction(env: Env, transactionId: string): Promi
   }
 
   if (!lines) {
+    // The decision to STOP is recorded in the same batch as the queue row. Leaving it out made the trail
+    // tell only half the story: every posting was audited, but the agent's most important act — refusing to
+    // book and asking a human — left no trace at all.
     await env.DB.batch([
       env.DB.prepare(`INSERT INTO review_queue (kind, ref_id, reasons, payload_json) VALUES ('classification', ?1, ?2, ?3)`)
         .bind(transactionId, JSON.stringify(decision.gateReasons), JSON.stringify({ input, decision })),
       env.DB.prepare(`UPDATE paypal_transactions SET state = 'review' WHERE transaction_id = ?1`).bind(transactionId),
+      auditInsert(
+        env,
+        await buildAuditRow(
+          {
+            ref_type: "review",
+            ref_id: transactionId,
+            event: "gated",
+            actor: "agent",
+            detail: {
+              top_reason: decision.gateReasons[0] ?? null,
+              reasons: decision.gateReasons,
+              account_choice: decision.account.choice,
+              needs_review_prob: decision.needsReview,
+              risk: decision.risk,
+              model: decision.model,
+            },
+          },
+          await readTail(env),
+        ),
+      ),
     ]);
     return "review";
   }
@@ -242,11 +265,227 @@ export async function runScheduledSync(env: Env): Promise<void> {
   await syncWindow(env, start.toISOString(), end.toISOString());
 }
 
+/* ──────────────────────────────── webhooks → transactions (T-L1-008a) ─────────────────────────── */
+
+/**
+ * Turn a verified PayPal webhook into a `paypal_transactions` row.
+ *
+ * Why this exists: Transaction Search lags new activity by up to ~3 hours, so a sync-only pipeline leaves
+ * the books hours behind reality. Webhooks arrive in seconds — they are the real-time path — but the old
+ * handler recorded the event and dropped it (`kind: "webhook"` was acked and ignored), so nothing
+ * downstream ever saw it.
+ *
+ * The webhook is only the *trigger*. A capture webhook carries the id, amount, fee and the related order
+ * id, but NOT the buyer's text: that lives only on the order (`purchase_units[0].description`), which is
+ * exactly what the injection guard has to read. So a capture costs one extra GET. A mapping that skipped
+ * that GET would still balance and still post — and would quietly book the injection demo as an ordinary
+ * sale, which is the one failure this product cannot afford.
+ *
+ * Event-code map, in the families `buildJournal` understands. Checked against what Transaction Search
+ * returns for the same sandbox activity:
+ *
+ *   PAYMENT.CAPTURE.COMPLETED       → T0006, amount +, fee −   (money received)
+ *   PAYMENT.CAPTURE.REFUNDED        → T1107, amount −, fee 0   (reversal of a capture)
+ *   PAYMENT.PAYOUTS-ITEM.SUCCEEDED  → T0001, amount −          (money sent to a payee)
+ *
+ * Everything else is recorded but books nothing — invoice and dunning events are not money movements.
+ */
+export type WebhookOutcome = "posted" | "review" | "skipped" | "not-bookable";
+
+/**
+ * Raised when a capture names an order we cannot read, so the buyer's text is unknown. It carries the
+ * partial detail because the transaction is still real — we just must not book it autonomously. The
+ * caller inserts the row and sends it to a human instead of retrying forever.
+ */
+export class BuyerTextUnreadableError extends Error {
+  constructor(message: string, public readonly detail: PayPalTransactionDetail) {
+    super(message);
+    this.name = "BuyerTextUnreadableError";
+  }
+}
+
+/** Normalise a PayPal timestamp to UTC ISO so entry_date cannot slip a day across a timezone offset. */
+function utc(iso: string | undefined): string {
+  const d = iso ? new Date(iso) : new Date();
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
+interface CaptureResource {
+  id: string;
+  amount?: { currency_code?: string; value?: string };
+  seller_receivable_breakdown?: { paypal_fee?: { value?: string } };
+  create_time?: string;
+  supplementary_data?: { related_ids?: { order_id?: string } };
+}
+
+interface RefundResource {
+  id: string;
+  amount?: { currency_code?: string; value?: string };
+  note_to_payer?: string;
+  create_time?: string;
+}
+
+interface PayoutItemResource {
+  transaction_id?: string;
+  payout_item_id?: string;
+  payout_item_fee?: { value?: string };
+  time_processed?: string;
+  payout_item?: { amount?: { currency_code?: string; value?: string }; receiver?: string; note?: string };
+}
+
+const asMoney = (currency: string, value: string) => ({ currency_code: currency, value });
+
+/** The money-moving part of a webhook payload, or null when the event books nothing. */
+export async function mapWebhookToTxn(
+  env: Env,
+  eventType: string,
+  resource: unknown,
+): Promise<PayPalTransactionDetail | null> {
+  if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
+    const r = resource as CaptureResource;
+    if (!r?.id) return null;
+    const currency = r.amount?.currency_code ?? "USD";
+    const fee = r.seller_receivable_breakdown?.paypal_fee?.value;
+    // The buyer's own words. Fetched from the order, never inferred.
+    const orderId = r.supplementary_data?.related_ids?.order_id;
+    const base: PayPalTransactionDetail = {
+      transaction_info: {
+        transaction_id: r.id,
+        transaction_event_code: "T0006",
+        transaction_initiation_date: utc(r.create_time),
+        transaction_amount: asMoney(currency, r.amount?.value ?? "0.00"),
+        // Transaction Search reports a capture's fee as negative; mirror that so both paths agree.
+        fee_amount: asMoney(currency, fee ? `-${fee}` : "0.00"),
+        transaction_status: "S",
+      },
+    };
+    // No related order means the capture has no order-level note at all — nothing to read, nothing missed.
+    if (!orderId) return base;
+
+    let order: PayPalOrder;
+    try {
+      order = await new PayPalClient(env).getOrder(orderId);
+    } catch (e) {
+      // The order EXISTS (the capture names it) but we could not read it, so we do not know what the buyer
+      // wrote. Booking it anyway would be the one failure this product cannot afford, so hand it to a human.
+      throw new BuyerTextUnreadableError(`order ${orderId} unreadable: ${(e as Error).message}`, base);
+    }
+    base.transaction_info.transaction_subject = order.purchase_units?.[0]?.description;
+    if (order.payer?.email_address) base.payer_info = { email_address: order.payer.email_address };
+    return base;
+  }
+
+  if (eventType === "PAYMENT.CAPTURE.REFUNDED") {
+    const r = resource as RefundResource;
+    if (!r?.id) return null;
+    const currency = r.amount?.currency_code ?? "USD";
+    return {
+      transaction_info: {
+        transaction_id: r.id,
+        transaction_event_code: "T1107",
+        transaction_initiation_date: utc(r.create_time),
+        // A refund moves money the other way: negative, even though PayPal sends the amount positive.
+        transaction_amount: asMoney(currency, `-${r.amount?.value ?? "0.00"}`),
+        fee_amount: asMoney(currency, "0.00"),
+        transaction_status: "S",
+        transaction_subject: r.note_to_payer,
+        transaction_note: r.note_to_payer,
+      },
+    };
+  }
+
+  if (eventType === "PAYMENT.PAYOUTS-ITEM.SUCCEEDED") {
+    const r = resource as PayoutItemResource;
+    const id = r?.transaction_id ?? r?.payout_item_id;
+    if (!id) return null;
+    const item = r.payout_item ?? {};
+    const currency = item.amount?.currency_code ?? "USD";
+    const fee = r.payout_item_fee?.value;
+    return {
+      transaction_info: {
+        transaction_id: id,
+        transaction_event_code: "T0001",
+        transaction_initiation_date: utc(r.time_processed),
+        transaction_amount: asMoney(currency, `-${item.amount?.value ?? "0.00"}`),
+        fee_amount: asMoney(currency, fee ? `-${fee}` : "0.00"),
+        transaction_status: "S",
+        transaction_subject: item.note,
+        transaction_note: item.note,
+      },
+      payer_info: item.receiver ? { email_address: item.receiver } : undefined,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Decide + post one stored webhook event. Idempotent two ways: the row is `INSERT OR IGNORE`, and
+ * `processTransaction` re-checks the stored state — so a webhook and the hourly sync racing over the same
+ * capture produce one entry, not two.
+ */
+export async function processWebhookEvent(env: Env, eventId: string): Promise<WebhookOutcome> {
+  const row = await env.DB.prepare(`SELECT body_json FROM webhook_events WHERE event_id = ?1`)
+    .bind(eventId).first<{ body_json: string }>();
+  if (!row) return "skipped";
+
+  const event = JSON.parse(row.body_json) as { event_type: string; resource?: unknown };
+  let detail: PayPalTransactionDetail | null;
+  let unreadable = false;
+  try {
+    detail = await mapWebhookToTxn(env, event.event_type, event.resource);
+  } catch (e) {
+    if (!(e instanceof BuyerTextUnreadableError)) throw e;
+    detail = e.detail;
+    unreadable = true;
+  }
+  if (!detail) return "not-bookable";
+
+  const info = detail.transaction_info;
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO paypal_transactions
+     (transaction_id, event_code, status, initiated_at, amount_cents, fee_cents, currency, counterparty, subject, note, invoice_id, reference_id, raw_json)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
+  ).bind(
+    info.transaction_id, info.transaction_event_code, info.transaction_status, info.transaction_initiation_date,
+    toCents(info.transaction_amount.value), toCents(info.fee_amount?.value), info.transaction_amount.currency_code,
+    toDecisionInput(detail).counterparty ?? null, info.transaction_subject ?? null, info.transaction_note ?? null,
+    info.invoice_id ?? null, info.paypal_reference_id ?? null, JSON.stringify(detail),
+  ).run();
+
+  // We could not read what the buyer wrote, so the agent does not get to book this one on its own — no
+  // model call, straight to the queue. Same shape as a gated classification so the review UI needs no
+  // special case, and the reason is explicit rather than a silent empty subject.
+  if (unreadable) {
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO review_queue (kind, ref_id, reasons, payload_json) VALUES ('classification', ?1, ?2, ?3)`)
+        .bind(info.transaction_id, JSON.stringify(["buyer_text_unreadable"]), JSON.stringify({ source: "webhook", event_id: eventId, subject: null })),
+      env.DB.prepare(`UPDATE paypal_transactions SET state = 'review' WHERE transaction_id = ?1`).bind(info.transaction_id),
+      auditInsert(
+        env,
+        await buildAuditRow(
+          {
+            ref_type: "review",
+            ref_id: info.transaction_id,
+            event: "gated",
+            actor: "agent",
+            detail: { top_reason: "buyer_text_unreadable", source: "webhook", event_id: eventId },
+          },
+          await readTail(env),
+        ),
+      ),
+    ]);
+    return "review";
+  }
+
+  return processTransaction(env, info.transaction_id);
+}
+
 export async function handleSyncBatch(batch: MessageBatch<SyncMessage>, env: Env): Promise<void> {
   for (const msg of batch.messages) {
     try {
       if (msg.body.kind === "transaction") await processTransaction(env, msg.body.transactionId);
-      // TODO: webhook events → map resource to transaction / invoice / payout updates
+      else await processWebhookEvent(env, msg.body.eventId);
       msg.ack();
     } catch (e) {
       console.error("queue message failed", msg.body, (e as Error).message);

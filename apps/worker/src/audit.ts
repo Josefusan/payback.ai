@@ -210,6 +210,12 @@ function storyLine(event: AuditEvent): string {
       const ref = str("paypal_ref");
       return `PayPal ${type} executed${ref ? ` as ${ref}` : ""} (approved by ${event.actor})`;
     }
+    case "gated": {
+      // The decision NOT to act is the one a controller most wants to see, so it gets a sentence rather
+      // than the generic fallback.
+      const reason = str("top_reason");
+      return `${event.ref_id} stopped and sent to a human${reason ? ` — ${reason}` : ""}`;
+    }
     default:
       return `${event.ref_type} ${event.ref_id}: ${event.event} by ${event.actor}`;
   }

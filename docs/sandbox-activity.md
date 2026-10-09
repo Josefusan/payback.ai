@@ -4,6 +4,25 @@ Every write to the PayPal sandbox (seed scripts, MCP tools, manual tests): what,
 
 | Date | Actor | Action | IDs | Notes |
 |---|---|---|---|---|
+| 2026-10-09 | seed-sandbox | order | `26582850TA7537804` | PB-1003 $49.00 — INJECTION DEMO — must be flagged possible_injection and blocked |
+| 2026-10-09 | seed-sandbox | capture | `9JW85869G0240513E` | PB-1003 captured (injection demo capture) — fee 2.20, net 46.80 |
+| 2026-10-09 | seed-sandbox | order | `3NV72061GT8822332` | PB-1003 $49.00 — INJECTION DEMO — must be flagged possible_injection and blocked |
+| 2026-10-09 | seed-sandbox | capture | `71A61418VK3602848` | PB-1003 captured (injection demo capture) — fee 2.20, net 46.80 |
+| 2026-10-09 | seed-sandbox | invoice | `INV2-F5MS-8QJ2-QC9N-VNUW` | PB-INV-2001 $1200.00 due in 10 days |
+| 2026-10-09 | seed-sandbox | invoice.sent | `INV2-F5MS-8QJ2-QC9N-VNUW` | INVOICING.INVOICE.SENT webhook |
+| 2026-10-09 | seed-sandbox | invoice | `INV2-4XYT-SKNF-HZAF-SHUM` | PB-INV-2002 $1200.00 OVERDUE (due 20 days ago) |
+| 2026-10-09 | seed-sandbox | payout | `W4HLNTA2GWRVS` | PAYMENT.PAYOUTSBATCH.* webhook, $120.00 |
+| 2026-10-09 | seed-sandbox | refund | `93U49571UK810960G` | full refund of 65P95304T06159344 |
+| 2026-10-09 | seed-sandbox | payout | `WN2LRPLN9NBRN` | PAYMENT.PAYOUTSBATCH.* webhook, $120.00 |
+| 2026-10-09 | seed-sandbox | invoice | `INV2-BLUC-HQGS-S4KK-3FSC` | PB-INV-2001 $1200.00 due in 10 days |
+| 2026-10-09 | seed-sandbox | invoice.sent | `INV2-BLUC-HQGS-S4KK-3FSC` | INVOICING.INVOICE.SENT webhook |
+| 2026-10-09 | seed-sandbox | invoice | `INV2-36YA-L86L-JEMJ-KK4N` | PB-INV-2002 $1200.00 OVERDUE (due 20 days ago) |
+| 2026-10-09 | seed-sandbox | order | `9GJ97296Y0872281X` | PB-1001 $49.00 — first sale, refunded below |
+| 2026-10-09 | seed-sandbox | capture | `65P95304T06159344` | PB-1001 captured — fee 2.20, net 46.80 |
+| 2026-10-09 | seed-sandbox | order | `7K1370760U8357140` | PB-1002 $49.00 — second sale, left un-refunded |
+| 2026-10-09 | seed-sandbox | capture | `86K83398YC044742M` | PB-1002 captured (left un-refunded so revenue survives) — fee 2.20, net 46.80 |
+| 2026-10-09 | seed-sandbox | order | `0VP26564GF4099726` | PB-1003 $49.00 — INJECTION DEMO — must be flagged possible_injection and blocked |
+| 2026-10-09 | seed-sandbox | capture | `4LV92806LH431611G` | PB-1003 captured (injection demo capture) — fee 2.20, net 46.80 |
 | 2026-10-08 | seed-sandbox | Order PB-1001 (current seed run) | `4T9532785U909910C` | $49.00 — captured |
 | 2026-10-08 | seed-sandbox | Captured PB-1001 | `50546257V9628894U` | $49.00 gross, fee $2.20, net $46.80 |
 | 2026-10-08 | seed-sandbox | Order PB-1002 | `3GT21851P57606619` | $49.00 — first checkout hit PayPal's transient error page; retried and captured |

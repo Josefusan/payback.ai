@@ -11,3 +11,6 @@ __pycache__/
 evals/out/
 .vscode/
 .idea/
+
+# Written to the repo root by scripts/seed-sandbox.mjs when a sandbox checkout fails to complete.
+seed-approve-*.png

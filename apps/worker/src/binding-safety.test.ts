@@ -411,7 +411,10 @@ describe("handleSyncBatch — a queue message keeps its receiver", () => {
     }
 
     const batch = { messages: [message], queue: "payback-sync", retryAll: () => {} };
-    await handleSyncBatch(batch as unknown as MessageBatch<SyncMessage>, makeEnv());
+    // A real ledger DB: the webhook branch now reads webhook_events, and an unknown event id must return
+    // "skipped" (ack) rather than throw. Without a DB this path would retry and the assertion below would
+    // pass for the wrong reason.
+    await handleSyncBatch(batch as unknown as MessageBatch<SyncMessage>, makeEnv({ DB: createLedgerDb() as unknown as Env["DB"] }));
 
     expect(acks).toEqual([message]);
     expect(retries).toEqual([]); // nothing was retried: ack() stayed a method call
