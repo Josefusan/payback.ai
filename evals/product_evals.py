@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import sys
 import urllib.request
@@ -40,11 +41,14 @@ def load(name: str) -> list[dict]:
 
 
 def post(url: str, payload: dict) -> dict:
-    headers = {"content-type": "application/json"}
+    # A User-Agent is sent deliberately: Cloudflare's bot protection answers the stdlib default
+    # (`Python-urllib/3.x`) with a bare 403 that looks nothing like an auth failure, which is a confusing
+    # way to discover the eval cannot reach the worker it is meant to be measuring.
+    headers = {"content-type": "application/json", "user-agent": "payback-evals/1.0 (+rules-compliance)"}
     if ADMIN_TOKEN:
         headers["x-admin-token"] = ADMIN_TOKEN
     req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST", headers=headers)
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=90) as r:
         return json.loads(r.read())
 
 
