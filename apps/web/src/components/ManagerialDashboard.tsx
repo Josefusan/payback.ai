@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { LEDGER_PATH, loadLedger, loadPnl, loadReconcile, PNL_PATH, RECONCILE_PATH, useLive } from "../data/api";
 import { deriveARAging, pnlByProductLine, receivableSourceLines } from "../data/reports";
 import { ARAgingWidget } from "./ARAgingWidget";
+import { ConfidenceDial } from "./ConfidenceDial";
 import { PnLByProductLine } from "./PnLByProductLine";
 import { ReconciliationTile } from "./ReconciliationTile";
 import { SourceBadge } from "./SourceBadge";
@@ -53,6 +54,7 @@ export function ManagerialDashboard() {
         <div className="widgets">
           <ReconciliationTile rows={reconcileRows} asOf={reconcileRows[0]?.asOfTime?.slice(0, 10)} loading={reconcile.loading} />
           <ARAgingWidget aging={arAging} />
+          <ConfidenceDial />
         </div>
 
         <PnLByProductLine pnl={pnlByProduct} />

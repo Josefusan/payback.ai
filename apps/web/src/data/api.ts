@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-import type { AuditResponse, AuditVerifyResponse, CoaAccount, LedgerEntryResponse, LedgerLine, PnlRow, ReviewItem } from "../../../../packages/contracts/api";
+import type { AuditResponse, AuditVerifyResponse, CoaAccount, LedgerEntryResponse, LedgerLine, PnlRow, ReviewItem, SweepPoint, ThresholdSetting } from "../../../../packages/contracts/api";
 import { parseAudit, parseAuditVerify } from "./audit";
 import { coa as FIXTURE_COA, parseCoa } from "./coa";
 import {
@@ -33,6 +33,7 @@ import {
   type ReconcileView,
 } from "./reports";
 import { parseReviewItems } from "./review";
+import { parseSweep, parseThreshold } from "./settings";
 import reviewJson from "../../../../packages/contracts/fixtures/review.json";
 
 /** Where the number on screen came from. Rendered as a badge, never implied. */
@@ -52,6 +53,8 @@ export const REVIEW_PATH = "/api/review";
 export const COA_PATH = "/api/coa";
 export const AUDIT_PATH = "/api/audit";
 export const AUDIT_VERIFY_PATH = "/api/audit/verify";
+export const THRESHOLD_PATH = "/api/settings/auto_post_threshold";
+export const SWEEP_PATH = "/api/confidence/sweep";
 
 /** The shipped review fixture, used when the Worker is unreachable. */
 const FIXTURE_REVIEW: ReviewItem[] = parseReviewItems(reviewJson);
@@ -128,7 +131,51 @@ export async function loadAuditVerify(): Promise<Loaded<AuditVerifyResponse | nu
   }
 }
 
-// ── review decisions (the only mutating call the dashboard makes) ────────────────────────────────
+// ── the autonomy dial ────────────────────────────────────────────────────────────────────────────
+//
+// No fixture fallback on either read: see the note in ./settings. A dial showing a fabricated position
+// would tell the operator the agent has authority it does not have.
+
+export async function loadThreshold(): Promise<Loaded<ThresholdSetting | null>> {
+  try {
+    return { data: parseThreshold(await getJson(THRESHOLD_PATH)), source: "live", error: null };
+  } catch (err) {
+    return { data: null, source: "fixture", error: message(err) };
+  }
+}
+
+export async function loadSweep(): Promise<Loaded<SweepPoint[] | null>> {
+  try {
+    return { data: parseSweep(await getJson(SWEEP_PATH)), source: "live", error: null };
+  } catch (err) {
+    return { data: null, source: "fixture", error: message(err) };
+  }
+}
+
+/**
+ * Turn the dial. Admin-gated, because this changes how much the agent may do without a person.
+ *
+ * Cached reads are dropped on success: the review screen prints the threshold each decision was taken
+ * against, so leaving the old value cached would caption new decisions with the previous setting.
+ */
+export async function putThreshold(value: number, by: string, token: string): Promise<ThresholdSetting> {
+  const res = await fetch(THRESHOLD_PATH, {
+    method: "PUT",
+    headers: { "content-type": "application/json", "x-admin-token": token },
+    body: JSON.stringify({ value, by }),
+  });
+  if (!res.ok) {
+    const parsed = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
+    throw new ApiError(parsed?.error ?? `http_${res.status}`, parsed?.detail);
+  }
+  const setting = parseThreshold(await res.json(), "PUT /api/settings/auto_post_threshold");
+  cache.delete(THRESHOLD_PATH);
+  cache.delete(SWEEP_PATH);
+  cache.delete(REVIEW_PATH);
+  return setting;
+}
+
+// ── review decisions (the only other mutating call the dashboard makes) ──────────────────────────
 
 export interface ReviewResolution {
   status: "approved" | "rejected";
