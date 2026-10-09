@@ -28,9 +28,11 @@ probability distribution behind its choice. Read it without a token; paste the t
 Small businesses and creators who sell through PayPal do their books by hand. Fees, refunds, holds and
 payouts don't map cleanly onto accounting, month-end close takes days, and unpaid invoices slip. Payback.ai:
 
-1. **Syncs** PayPal activity — Transaction Search, Balances, verified Webhooks, Invoicing (sandbox).
+1. **Syncs** PayPal activity — Transaction Search and Balances on an hourly schedule, plus
+   signature-verified webhooks.
 2. **Decides** with **Cloudflare Workers AI (Clef)** — GL account, product line, needs-review, risk, and
-   whether untrusted text is trying to give it instructions — each with calibrated probabilities.
+   whether untrusted text is trying to give it instructions — each carrying a probability the reviewer
+   can see, not just a choice.
 3. **Books** balanced double-entry journals, splitting gross revenue, merchant fees and net cash.
 4. **Reconciles** the ledger against PayPal's own balance, with a *pending* bucket that names the
    difference (unposted, still-in-review items) instead of hiding it.
@@ -83,14 +85,14 @@ in the review queue, unposted.
 
 | Capability | Used for | Status |
 |---|---|---|
-| Transaction Search | Ledger ingestion | **working** |
-| Balances | Reconciliation + opening balance | **working** |
-| Webhooks (signature-verified, deduped) | Real-time updates | **working** (verified live) |
-| Workers AI — Clef / clef-flash | Calibrated decisions on every transaction | **working** |
-| Invoicing v2 | AR reminders | seeded (2 invoices), action gated on policy |
-| Payouts | Paying approved vendor bills | seeded, gated on policy + human |
-| Disputes | Dispute triage | seeded |
-| AG Grid | Ledger grid, review queue, managerial dashboard | **working** (live data) |
+| Transaction Search | Ledger ingestion | **working** — real sandbox captures booked |
+| Balances | Reconciliation + opening balance | **working** — tie-out reaches `ok true` |
+| Webhooks (signature-verified, deduped) | Real-time updates | verified live; recorded then dropped (see above) |
+| Workers AI — Clef / clef-flash | Decisions, incl. injection detection | **working** — live decision at p=0.966 |
+| Invoicing v2 | AR reminders | client + approval route built; **no action has executed yet** |
+| Payouts | Paying approved vendor bills | client + approval route built; **nothing executed** (`GET /api/actions` is empty) |
+| Disputes | Dispute triage | client + approval route built; **nothing executed** |
+| AG Grid | Ledger grid, review queue, drill-through | **working** — reads the live Worker |
 
 ## Safety model — why it can't be talked into moving money
 
@@ -104,9 +106,32 @@ Three independent layers, because any one alone is a story rather than a control
 3. **Hard caps.** `src/policy.ts` refuses money movement over fixed limits regardless of what any model
    says. The model proposes; deterministic policy disposes.
 
-Plus: an append-only ledger enforced by SQLite triggers (corrections are reversals, never edits), a
-hash-chained audit log, and an explicit **autonomy dial** — `POST /api/settings/auto_post_threshold`
-decides what the agent may post alone.
+Plus an append-only ledger, enforced by SQLite triggers that reject any `UPDATE` or `DELETE` on
+`journal_entries` and `journal_lines` (`migrations/0002_journal_approver.sql`) — a correction is a
+reversal entry, never an edit. Approving a contested item records a named human as the entry's approver.
+
+## What is NOT built yet
+
+We only document what works, so here is the other half of the ledger. These are declared in
+`packages/contracts/api.ts` but **return 404 today**:
+
+- **Hash-chained audit trail** (`GET /api/audit`, `GET /api/audit/verify`). The routes are empty stubs
+  and there is no `audit_log` table — the planned migration was never written. `docs/18-finish-roadmap.md`
+  carries it as an open task. Nothing in this README depends on it, and no screen claims it.
+- **Autonomy dial** (`GET|PUT /api/settings/auto_post_threshold`). The threshold is a deployment
+  setting (`AUTO_POST_THRESHOLD` in `wrangler.jsonc`), not something a controller can turn at runtime.
+- **`GET /api/confidence/sweep`** and its dashboard widget.
+
+Also unfinished, with the reason:
+
+- **The `Sync` and `Agent actions` screens.** Both are listed as *planned* in the dashboard nav and are
+  deliberately not selectable. Sync runs on an hourly cron and via `POST /api/sync`.
+- **Webhook events are verified and deduped, then dropped.** `handleSyncBatch` carries a
+  `// TODO: webhook events → map resource to transaction`, so a payment booking waits for the next
+  Transaction Search sync (PayPal's search index lags captures by roughly three hours) instead of
+  booking on the webhook. This is the single biggest remaining engineering gap.
+- **Managerial reporting is P&L by product line, AR aging and reconciliation — not the full set.** No
+  budget-vs-actual variance, no cash forecast, no dimensions beyond product line.
 
 ## Run it
 
