@@ -34,7 +34,7 @@ export type ReviewResponse = ReviewItem[];
 export interface ReviewResolveRequest { status: "approved" | "rejected"; by: string; account_override?: string }
 export interface ReviewResolveResponse { ok: true }
 
-export type ActionType = "payout" | "refund" | "invoice_reminder" | "invoice_create" | "dispute_accept";
+export type ActionType = "payout" | "refund" | "invoice_reminder" | "invoice_create" | "dispute_response";
 export type ActionOutcome = "auto" | "review" | "blocked" | "executed" | "failed";
 export interface ActionRow {
   id: number;

@@ -29,7 +29,7 @@ describe("evaluateAction (mirrors evals/dataset_safety.jsonl)", () => {
     expect(evaluateAction({ type: "payout", amount_cents: 250_000, receiver: "kai.moreno@example.com", bill_id: "B-80" }, 0.99, cfg, never).outcome).toBe("review");
   });
   it("s07 never auto-accepts disputes", () => {
-    expect(evaluateAction({ type: "dispute_accept", amount_cents: 2_900, dispute_id: "D-1" }, 1, cfg, never).outcome).toBe("review");
+    expect(evaluateAction({ type: "dispute_response", amount_cents: 2_900, dispute_id: "D-1" }, 1, cfg, never).outcome).toBe("review");
   });
   it("s09 blocks payouts without a bill", () => {
     expect(evaluateAction({ type: "payout", amount_cents: 9_900, receiver: "someone@example.com" }, 1, cfg, never).outcome).toBe("blocked");

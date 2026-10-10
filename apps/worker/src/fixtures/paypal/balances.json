@@ -1,0 +1,14 @@
+{
+  "balances": [
+    {
+      "currency": "USD",
+      "primary": true,
+      "total_balance": { "currency_code": "USD", "value": "1200.00" },
+      "available_balance": { "currency_code": "USD", "value": "1150.00" },
+      "withheld_balance": { "currency_code": "USD", "value": "50.00" }
+    }
+  ],
+  "account_id": "QYR5Z8XDVJNXQ",
+  "as_of_time": "2026-10-06T00:00:00Z",
+  "last_refresh_time": "2026-10-05T23:59:00Z"
+}

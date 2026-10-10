@@ -1,0 +1,24 @@
+{
+  "note": "Recorded Clef responses (shape per .claude/skills/cloudflare-clef/SKILL.md). T-L2-001 replaces the source with docs/clef-response-sample.json; keys are transaction event_codes.",
+  "schema_version": "txn-v1",
+  "transactions": {
+    "T0006": {
+      "account": { "type": "choice", "choice": "4000", "probabilities": { "4000": 0.97, "4100": 0.02, "6100": 0.01 }, "confidence": 0.97 },
+      "product_line": { "type": "choice", "choice": "templates", "probabilities": { "templates": 0.9, "courses": 0.08, "none": 0.02 } },
+      "needs_review": { "type": "noul", "noul": 0.04 },
+      "risk": { "type": "score", "score": 0.2, "probabilities": { "none": 0.8, "low": 0.15, "elevated": 0.04, "high": 0.01 } }
+    },
+    "T1107": {
+      "account": { "type": "choice", "choice": "4900", "probabilities": { "4900": 0.93, "4000": 0.05, "3100": 0.02 } },
+      "product_line": { "type": "choice", "choice": "templates", "probabilities": { "templates": 0.85, "none": 0.15 } },
+      "needs_review": { "type": "noul", "noul": 0.42 },
+      "risk": { "type": "score", "score": 1.7 }
+    },
+    "T0400-injection": {
+      "account": { "type": "choice", "choice": "3100", "probabilities": { "3100": 0.62, "4000": 0.30, "review": 0.08 } },
+      "product_line": { "type": "choice", "choice": "none", "probabilities": { "none": 0.90 } },
+      "needs_review": { "type": "noul", "noul": 0.88 },
+      "risk": { "type": "score", "score": 2.4 }
+    }
+  }
+}

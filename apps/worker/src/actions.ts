@@ -120,7 +120,24 @@ export async function executeProposal(
     if (!shouldExecute) {
       if (existing) return reportExisting(env, existing, proposal, opts);
       const recorded = await insertRecord(env, { key, proposal, decisionJson, policy, approver: opts.approver ?? null });
-      if (recorded) return recorded;
+      if (recorded) {
+        // A real proposal the deterministic gate REFUSED (not a dry run, and not merely queued for review)
+        // now leaves an immutable record too: the `actions` row only shows the refusal until the next writer
+        // touches it, and "the agent tried to move money and policy stopped it" is exactly the event a
+        // controller audits. Guarded on `recorded` (the fresh INSERT, not the race loser) so a repeat key
+        // appends nothing.
+        if (!opts.dryRun && policy.outcome === "blocked") {
+          await appendFailureAudit(env, {
+            id: recorded.id,
+            type: proposal.type,
+            amountCents: proposal.amount_cents ?? null,
+            policyRule: policy.rule,
+            error: `blocked_by_policy:${policy.rule}`,
+            actor: opts.approver ?? "agent",
+          });
+        }
+        return recorded;
+      }
       const raced = await findActionByKey(env, key);
       return reportExisting(env, raced ?? failedRow(key, proposal, "idempotency_key_conflict"), proposal, opts);
     }
@@ -157,10 +174,24 @@ export async function executeProposal(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const failed = await failExecution(env, claimed.id, message, claimed.error ?? "");
-      return {
-        ...(failed ?? { ...claimed, outcome: "failed" as const, paypal_ref: null, error: message }),
-        wonTransition: true,
-      };
+      const row = failed ?? { ...claimed, outcome: "failed" as const, paypal_ref: null, error: message };
+      // The `actions` row is MUTABLE — FAIL_ACTION and the claim transition rewrite its outcome, error and
+      // approver on every retry — so PayPal refusing an approved money movement would otherwise leave no
+      // tamper-evident record at all. Append it inside the won-claim branch (only the request that actually
+      // attempted PayPal reaches here, exactly like the success path), and only when this key has not already
+      // recorded a failure: `existing` is the state read before this attempt, so `outcome === 'failed'` means
+      // a previous attempt already wrote the row and a retry that fails the same way must not duplicate it.
+      if (existing?.outcome !== "failed") {
+        await appendFailureAudit(env, {
+          id: claimed.id,
+          type: proposal.type,
+          amountCents: proposal.amount_cents ?? null,
+          policyRule: row.policy_rule,
+          error: message,
+          actor: opts.approver ?? claimed.approver ?? "agent",
+        });
+      }
+      return { ...row, wonTransition: true };
     }
   } catch (err) {
     // Never throw: an infrastructure failure is still an audited attempt.
@@ -216,10 +247,49 @@ async function callPayPal(env: Env, proposal: ActionProposal, key: string): Prom
       });
       return res.batch_header?.payout_batch_id ?? null;
     }
+    case "dispute_response": {
+      if (!proposal.dispute_id) throw new Error("dispute_response requires dispute_id");
+      // The verb is chosen from the dispute's own `links` (accept-claim is not legal at every stage), so the
+      // GET happens first; the POST carries the deterministic PayPal-Request-Id for idempotency. The dispute
+      // id is the `paypal_ref` — it is the handle an operator needs to inspect what was answered.
+      return pp.respondToDispute(proposal.dispute_id, `Substantive response to dispute ${proposal.dispute_id}.`, id);
+    }
     default:
       // No PayPal REST call is wired for this action type yet — say so instead of claiming an execution.
       throw new Error(`no_paypal_executor:${proposal.type}`);
   }
+}
+
+/* ───────────────────────────────────────────────────────────── audit (failure) */
+
+/**
+ * Append the refusal or failure of one action to the tamper-evident chain.
+ *
+ * The `actions` row is the mutable working record (outcome/error/approver are rewritten on retries), so on
+ * its own it cannot prove that a named human approved a money movement and PayPal then refused it. This row
+ * is that proof, and it is best-effort for the same reason the success-path row is: the money did not move,
+ * so an audit failure must not change what the caller reports.
+ *
+ * `ref_type` is `action` (permitted by the CHECK in migrations/0003_audit.sql) and `event` is `failed` —
+ * deliberately not `changed`, which `storyLine` reserves for autonomy-dial wording. The action id is the
+ * `ref_id`; the type, policy rule and error live in `detail`; the approver is the `actor`.
+ */
+async function appendFailureAudit(
+  env: Env,
+  entry: { id: number; type: ActionProposal["type"]; amountCents: number | null; policyRule: string | null; error: string; actor: string },
+): Promise<void> {
+  await appendAuditQuietly(env, {
+    ref_type: "action",
+    ref_id: String(entry.id),
+    event: "failed",
+    actor: entry.actor,
+    detail: {
+      type: entry.type,
+      amount_cents: entry.amountCents ?? null,
+      policy_rule: entry.policyRule,
+      error: entry.error,
+    },
+  });
 }
 
 /* ──────────────────────────────────────────────────────────────── table */

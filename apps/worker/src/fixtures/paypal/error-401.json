@@ -1,0 +1,11 @@
+{
+  "name": "AUTHENTICATION_FAILURE",
+  "message": "Authentication failed due to invalid authentication credentials or a missing Authorization header.",
+  "debug_id": "8f0e2d3c4b5a6",
+  "details": [
+    {
+      "issue": "INVALID_ACCOUNT_STATUS",
+      "description": "Account validations failed for the provided client credentials."
+    }
+  ]
+}

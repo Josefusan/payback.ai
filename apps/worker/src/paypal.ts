@@ -114,6 +114,52 @@ export interface PayPalOrder {
   payer?: { email_address?: string; payer_id?: string };
 }
 
+/** One hypermedia link on a dispute. `rel` names the action PayPal will actually accept. */
+export interface PayPalDisputeLink { href: string; rel: string; method?: string }
+
+/** The subset of a dispute this worker reads. The `links` are the authority on which verb is legal. */
+export interface PayPalDispute {
+  dispute_id: string;
+  reason?: string;
+  status?: string;
+  dispute_state?: string;
+  dispute_life_cycle_stage?: string;
+  dispute_amount?: Money;
+  seller_protection_eligible?: boolean;
+  links?: PayPalDisputeLink[];
+}
+
+/**
+ * The dispute actions this client implements, in preference order, mapped from the `rel` PayPal advertises
+ * to the path segment of the action endpoint (`POST /v1/customer/disputes/{id}/<path>`).
+ *
+ * PayPal only offers the verbs that are LEGAL at the dispute's current lifecycle stage, so we read them
+ * rather than assume: a chargeback under review (`dispute_life_cycle_stage: CHARGEBACK`,
+ * `dispute_state: UNDER_PAYPAL_REVIEW`) advertises `provide_supporting_info` and NOT `accept_claim`.
+ */
+export const DISPUTE_ACTIONS: ReadonlyArray<{ rel: string; path: string }> = [
+  { rel: "provide_supporting_info", path: "provide-supporting-info" },
+  { rel: "accept_claim", path: "accept-claim" },
+];
+
+export interface PayPalDisputeAction { rel: string; path: string }
+
+/** Normalise a rel so `provide_supporting_info`, `provide-supporting-info` and mixed case all match. */
+function normaliseRel(rel: string): string {
+  return rel.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+/**
+ * Choose the substantive action PayPal currently permits for a dispute, from ITS OWN links.
+ * `provide-supporting-info` is preferred (it answers the claim rather than conceding it); `accept-claim`
+ * is used only when the dispute actually advertises it. Returns null when none is offered — the caller
+ * records that as a failure instead of POSTing a verb this lifecycle stage will refuse.
+ */
+export function chooseDisputeAction(links: ReadonlyArray<{ rel?: string }> = []): PayPalDisputeAction | null {
+  const offered = new Set(links.map((l) => normaliseRel(l.rel ?? "")));
+  return DISPUTE_ACTIONS.find((a) => offered.has(a.rel)) ?? null;
+}
+
 export class PayPalError extends Error {
   constructor(public status: number, public debugId: string | undefined, public body: unknown) {
     super(`PayPal ${status}${debugId ? ` (debug_id ${debugId})` : ""}`);
@@ -347,6 +393,34 @@ export class PayPalClient {
     return this.request<{ items?: Array<{ dispute_id: string; reason: string; status: string; dispute_amount: Money }> }>(
       "GET", "/v1/customer/disputes", { query: state ? { dispute_state: state } : {} },
     );
+  }
+
+  /** One dispute — including the action `links` that are LEGAL at its current lifecycle stage. */
+  getDispute(disputeId: string) {
+    return this.request<PayPalDispute>("GET", `/v1/customer/disputes/${encodeURIComponent(disputeId)}`);
+  }
+
+  /**
+   * Substantively respond to a dispute by POSTing the action its own `links` permit (never a verb we
+   * assumed). Returns the dispute id, which is what the caller stores as `paypal_ref`.
+   *
+   * The verb is read from the dispute, not guessed: at `dispute_life_cycle_stage: CHARGEBACK` /
+   * `dispute_state: UNDER_PAYPAL_REVIEW` PayPal offers only `provide_supporting_info` — `accept-claim`
+   * is refused there. `chooseDisputeAction` prefers provide-supporting-info and uses accept-claim only
+   * when the dispute actually advertises that link. If none of the actions we implement is offered, this
+   * throws a recorded failure rather than blindly POSTing a verb PayPal will reject.
+   */
+  async respondToDispute(disputeId: string, note: string, requestId: string): Promise<string> {
+    const dispute = await this.getDispute(disputeId);
+    const action = chooseDisputeAction(dispute.links ?? []);
+    if (!action) {
+      const offered = (dispute.links ?? []).map((l) => l.rel).filter((rel): rel is string => !!rel).join(", ") || "none";
+      throw new Error(`dispute ${disputeId} offers no action this client implements (links: ${offered})`);
+    }
+    // `accept-claim` takes `note`; `provide-supporting-info` takes `notes` (.claude/skills/paypal-sdks/rest-api.md).
+    const body = action.path === "accept-claim" ? { note } : { notes: note };
+    await this.request("POST", `/v1/customer/disputes/${encodeURIComponent(disputeId)}/${action.path}`, { body, requestId });
+    return dispute.dispute_id ?? disputeId;
   }
 
   // ── Webhooks ─────────────────────────────────────────────────────────────

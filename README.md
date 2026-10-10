@@ -150,8 +150,9 @@ Still unfinished, with the reason:
 - **The `Sync` and `Agent actions` screens.** Both are listed as *planned* in the dashboard nav and are
   deliberately not selectable. Sync runs on an hourly cron and via `POST /api/sync`; actions run through
   `POST /api/actions/propose`.
-- **Only refunds and payouts have executed.** Invoice reminders and dispute triage have clients and an
-  approval route, but nothing has run them; `GET /api/actions` shows exactly what has.
+- **Only refunds and payouts have executed.** Invoice reminders and dispute responses now have clients, an
+  approval route and a wired executor, but nothing has run them against the sandbox; `GET /api/actions`
+  shows exactly what has.
 - **No cash-flow or working-capital view.** The tie-out proves the hard half (PayPal's balance against the
   ledger), but opening cash, cash in/out and closing position are not presented as their own report.
 - **Dimensions stop at product line.** Management accounting wants customer, vendor, project and period on
@@ -160,11 +161,15 @@ Still unfinished, with the reason:
   from the ledger, and the managerial screen carries a `BudgetEntry` form (`PUT /api/budgets`) so a
   controller can set next month's plan without a redeploy. The demo company's starting budgets come from
   `migrations/0005_budgets.sql`.
-- **Dispute triage cannot complete.** Everything up to PayPal works — the proposal, the deterministic gate
-  (`dispute_acceptance_needs_human`), the human approval, the idempotency key — but `callPayPal` has no
-  executor for `dispute_accept`, so an approved dispute ends `outcome: failed` with
-  `no_paypal_executor:dispute_accept`. We found this by running it. Nothing about the sandbox dispute
-  changes.
+- **Dispute triage now reaches PayPal, but a live sandbox response is not yet captured.** Everything up to
+  PayPal works — the proposal, the deterministic gate (`dispute_acceptance_needs_human`), the human approval,
+  the idempotency key. We found, by running it, that an approved dispute ended `outcome: failed` with
+  `no_paypal_executor:dispute_accept`, and that `dispute_accept` was the wrong verb: a chargeback under
+  PayPal review (`dispute_life_cycle_stage: CHARGEBACK`, `dispute_state: UNDER_PAYPAL_REVIEW`) offers only
+  `provide_supporting_info`, not `accept-claim`. The executor is now `dispute_response`, which reads the
+  dispute's own `links` and answers with the verb that stage permits (`provide-supporting-info` preferred,
+  `accept-claim` only when the dispute advertises it). Covered by unit tests with PayPal stubbed; the
+  sandbox call itself is still to be demonstrated.
 
 ## Architecture
 

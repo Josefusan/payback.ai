@@ -210,6 +210,13 @@ function storyLine(event: AuditEvent): string {
       const ref = str("paypal_ref");
       return `PayPal ${type} executed${ref ? ` as ${ref}` : ""} (approved by ${event.actor})`;
     }
+    case "failed": {
+      // The mirror of "executed", and the event a controller most wants: a human approved a money movement
+      // and it was refused (by PayPal or by policy). The `error` says which.
+      const type = str("type") ?? "action";
+      const err = str("error");
+      return `${type} ${event.ref_id} not executed (by ${event.actor})${err ? ` — ${err}` : ""}`;
+    }
     case "gated": {
       // The decision NOT to act is the one a controller most wants to see, so it gets a sentence rather
       // than the generic fallback.

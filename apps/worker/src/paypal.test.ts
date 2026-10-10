@@ -4,7 +4,7 @@
  * The live sandbox call is wired in `paypal.live.test.ts` (runs when credentials land).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PayPalClient, PayPalError, PayPalScopeError, REPORTING_SEARCH_SCOPE, peekTokenCache, resetTokenCache } from "./paypal";
+import { PayPalClient, PayPalError, PayPalScopeError, REPORTING_SEARCH_SCOPE, chooseDisputeAction, peekTokenCache, resetTokenCache } from "./paypal";
 import type { PayPalTransactionDetail } from "./paypal";
 import type { Env } from "./env";
 import oauthToken from "../test/fixtures/paypal/oauth-token.json";
@@ -376,6 +376,68 @@ describe("PayPalClient — scope-staleness self-heal (403)", () => {
     expect(err).not.toBeInstanceOf(PayPalScopeError);
     expect(calls.filter((c) => c.url.endsWith(TERMINATE_PATH))).toHaveLength(0); // no revoke, no retry
     expect(calls.filter((c) => c.url.includes(BALANCES_PATH))).toHaveLength(1);
+  });
+});
+
+describe("PayPalClient — dispute response (defect 1)", () => {
+  const DISPUTE_ID = "PP-R-LMT-10190941";
+  const DISPUTE_PATH = `/v1/customer/disputes/${DISPUTE_ID}`;
+
+  it("chooses provide-supporting-info for a dispute that offers only that verb", () => {
+    expect(chooseDisputeAction([{ rel: "self" }, { rel: "provide_supporting_info" }])).toEqual({
+      rel: "provide_supporting_info",
+      path: "provide-supporting-info",
+    });
+  });
+
+  it("still prefers provide-supporting-info when accept-claim is also offered", () => {
+    expect(chooseDisputeAction([{ rel: "self" }, { rel: "accept_claim" }, { rel: "provide_supporting_info" }])?.path).toBe("provide-supporting-info");
+  });
+
+  it("uses accept-claim only when that is the only action offered", () => {
+    expect(chooseDisputeAction([{ rel: "self" }, { rel: "accept_claim" }])?.path).toBe("accept-claim");
+  });
+
+  it("returns null when the dispute offers no action this client implements", () => {
+    expect(chooseDisputeAction([{ rel: "self" }])).toBeNull();
+    expect(chooseDisputeAction([])).toBeNull();
+  });
+
+  it("GETs the dispute, then POSTs the legal verb with the PayPal-Request-Id", async () => {
+    const { fetchImpl, calls } = scriptedFetch([
+      { json: oauthToken }, // OAuth
+      {
+        json: {
+          dispute_id: DISPUTE_ID,
+          dispute_life_cycle_stage: "CHARGEBACK",
+          dispute_state: "UNDER_PAYPAL_REVIEW",
+          links: [{ rel: "self" }, { rel: "provide_supporting_info" }],
+        },
+      },
+      { status: 204 }, // POST action -> 204 No Content
+    ]);
+    const pp = new PayPalClient(makeEnv(), { fetch: fetchImpl });
+
+    const ref = await pp.respondToDispute(DISPUTE_ID, "Responding with delivery tracking.", "dispute_response-PP-R-LMT-10190941-4900");
+
+    expect(ref).toBe(DISPUTE_ID);
+    expect(calls.map((c) => new URL(c.url).pathname)).toEqual([TOKEN_PATH, DISPUTE_PATH, `${DISPUTE_PATH}/provide-supporting-info`]);
+    expect(bearer(calls[1]!)).toBe(`Bearer ${oauthToken.access_token}`);
+    const post = calls[2]!;
+    expect(post.init.method).toBe("POST");
+    expect(new Headers(post.init.headers as HeadersInit).get("paypal-request-id")).toBe("dispute_response-PP-R-LMT-10190941-4900");
+    expect(JSON.parse(String(post.init.body))).toEqual({ notes: "Responding with delivery tracking." });
+  });
+
+  it("refuses, without POSTing, when the dispute offers no implemented action", async () => {
+    const { fetchImpl, calls } = scriptedFetch([
+      { json: oauthToken },
+      { json: { dispute_id: DISPUTE_ID, links: [{ rel: "self" }] } },
+    ]);
+    const pp = new PayPalClient(makeEnv(), { fetch: fetchImpl });
+
+    await expect(pp.respondToDispute(DISPUTE_ID, "note", "req-1")).rejects.toThrow(/offers no action/);
+    expect(calls.map((c) => new URL(c.url).pathname)).toEqual([TOKEN_PATH, DISPUTE_PATH]); // no POST attempted
   });
 });
 

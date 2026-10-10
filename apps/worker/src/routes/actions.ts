@@ -9,7 +9,7 @@ import type { ActionProposal } from "../policy";
 
 export const actions = new Hono<AppEnv>();
 
-const ACTION_TYPES = ["payout", "refund", "invoice_reminder", "invoice_create", "dispute_accept"] as const;
+const ACTION_TYPES = ["payout", "refund", "invoice_reminder", "invoice_create", "dispute_response"] as const;
 
 /** A proposal is only ever a type plus its identifiers and an amount; anything else is not one. */
 function isActionProposal(value: unknown): value is ActionProposal {

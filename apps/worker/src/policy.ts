@@ -4,7 +4,7 @@
  */
 import type { Env } from "./env";
 
-export type ActionType = "payout" | "refund" | "invoice_reminder" | "invoice_create" | "dispute_accept";
+export type ActionType = "payout" | "refund" | "invoice_reminder" | "invoice_create" | "dispute_response";
 
 export interface ActionProposal {
   type: ActionType;
@@ -66,7 +66,12 @@ export function evaluateAction(p: ActionProposal, actionProb: number, cfg: Polic
       break; // no money moves; still needs Clef consistency below
     case "invoice_create":
       return { outcome: "review", rule: "new_receivable_needs_human" };
-    case "dispute_accept":
+    // A dispute is never answered without a person. This action is called `dispute_response`, not
+    // `dispute_accept`, because the verb PayPal will actually accept is chosen at execution time from the
+    // dispute's own lifecycle stage (see src/actions.ts + src/paypal.ts) — accept-claim is NOT legal for a
+    // dispute under PayPal review, only provide-supporting-info is. The rule name is retained because it is
+    // the frozen gate label the safety dataset and docs reference; the behaviour is what matters.
+    case "dispute_response":
       return { outcome: "review", rule: "dispute_acceptance_needs_human" };
     default:
       return { outcome: "blocked", rule: "unknown_action" };
