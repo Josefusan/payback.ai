@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>02 — books</title>
+  <script src="../timeline.js"></script>
+</head>
+<body>
+  <script>
+    const DUR = window.SCENE_DURATION || 20;
+    const pb = PB.mount({
+      total: window.FILM_TOTAL || 164,
+      offset: window.SCENE_OFFSET || 0,
+      labelIndex: "01",
+      labelText: "Double-entry books",
+      topRight: "GET /api/ledger",
+    });
+    const G = PB.GEO;
+    const S = G.scale;
+
+    // The full ledger page, so the camera can travel through a real screenshot rather than a still.
+    const ledger = PB.frame("../captures/ledger-full.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 ledger",
+    });
+    // The reconciliation tile lives on the managerial screen; the cut is honest about that.
+    const recon = PB.frame("../captures/reconcile-after.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 managerials",
+    });
+    document.body.append(ledger.el, recon.el);
+    document.body.appendChild(pb.node.cursor);
+
+    const camL = PB.camera(ledger);
+    const camR = PB.camera(recon);
+    // Reconciliation widget in capture space (read off the real screen: x 286-1018, y 116-336).
+    const RX = 286, RY = 116, RW = 732, RH = 220;
+    const ZB = 1.178, X0B = 0, Y0B = 76;
+
+    window.seek = function (t) {
+      pb.setProgress(t);
+      pb.moveBg(t);
+      pb.node.top.style.opacity = "1";
+      pb.node.label.style.opacity = "1";
+
+      // ── 0–13.4 s: travel down the real ledger page (1546 px tall, 917 rows on screen at this zoom) ──
+      const outA = PB.smooth(PB.prog(t, 13.0, 14.4));
+      ledger.el.style.opacity = String(1 - outA);
+      camL.view(S, 0, PB.lerp(0, 629, PB.easeInOut(PB.prog(t, 0.2, 13.4))));
+
+      // ── 13.4–20 s: the tie-out tile, grown to fill the frame ──
+      const inB = PB.smooth(PB.prog(t, 13.2, 14.6));
+      recon.el.style.opacity = String(inB);
+      const y0 = Y0B + PB.prog(t, 15.0, 20) * 18;
+      camR.view(ZB, X0B, y0);
+      const r = camR.rect(ZB, X0B, y0, RX, RY, RW, RH);
+      recon.callout(r.x, r.y, r.w, r.h, "GET /api/reconcile", inB * (1 - PB.smooth(PB.prog(t, 19.2, 20))));
+
+      const caps = [
+        [0.5, 7.3, "It reads every transaction and posts real <b>double-entry</b> books \u2014 gross, PayPal's fee, and net cash, as separate lines."],
+        [7.7, 13.5, "The fee is split to its own account, and every journal balances to the cent."],
+        [13.9, 19.7, "Then the ledger is checked against PayPal's own balance. The pending bucket names what is settled but not yet posted."],
+      ];
+      let text = caps[0][2], alpha = 0;
+      for (const [a, b, s] of caps) {
+        const p = PB.pulse(t, a, b, 0.28, 0.3);
+        if (p > alpha) { alpha = p; text = s; }
+      }
+      pb.setCaption(text, alpha);
+    };
+  </script>
+</body>
+</html>

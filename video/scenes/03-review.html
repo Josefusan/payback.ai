@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>03 — review</title>
+  <script src="../timeline.js"></script>
+</head>
+<body>
+  <script>
+    const pb = PB.mount({
+      total: window.FILM_TOTAL || 164,
+      offset: window.SCENE_OFFSET || 0,
+      labelIndex: "02",
+      labelText: "The review queue",
+      topRight: "GET /api/review \u2014 item #5",
+    });
+    const G = PB.GEO;
+    const S = G.scale;
+
+    const review = PB.frame("../captures/review-full.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 review queue",
+    });
+    document.body.appendChild(review.el);
+    document.body.appendChild(pb.node.cursor);
+
+    const cam = PB.camera(review);
+    // Capture-space geometry, read off the real screenshot: the provenance pane starts at x 640 and the
+    // injection alert sits at y 96. 1920x2105 page; the frame shows 917 of those rows at S.
+    const DETAIL_X0 = 563.5;   // = 1920 - 1560/1.15: the rightmost origin that still fills the frame
+    const ZB = 1.15;
+
+    window.seek = function (t) {
+      pb.setProgress(t);
+      pb.moveBg(t);
+      pb.node.top.style.opacity = "1";
+      pb.node.label.style.opacity = "1";
+
+      // Start wide (the queue as a reviewer first sees it), then push in on the provenance pane and
+      // travel down it to the probability distribution.
+      const push = PB.easeInOut(PB.prog(t, 4.4, 7.6));
+      const zoom = PB.lerp(S, ZB, push);
+      const x0 = PB.lerp(0, DETAIL_X0, push);
+      const y0 = PB.lerp(0, 1457, PB.easeInOut(PB.prog(t, 7.6, 26.0)));
+      cam.view(zoom, x0, y0);
+
+      // A pointer that walks to the flagged row and clicks it.
+      const wide = 1 - PB.smooth(PB.prog(t, 4.0, 4.9));
+      pb.cursorPath(t, [[1180, 880], [700, 560], [352, 402], [352, 402]], {
+        start: 0.6, end: 3.6, opacity: wide, clickAt: [4.0], rippleDur: 0.8,
+      });
+
+      // Ring the untrusted evidence while the caption talks about it.
+      const r = cam.rect(zoom, x0, y0, 652, 556, 1250, 108);
+      review.callout(r.x, r.y, r.w, r.h, "untrusted \u2014 the buyer's own text", PB.pulse(t, 5.4, 12.4, 0.22, 0.25));
+
+      const caps = [
+        [0.5, 5.1, "The agent does not guess. Below its confidence threshold it stops \u2014 and shows you why."],
+        [5.4, 11.6, "The reason code, the probability on every account it considered, and the buyer's own text, marked <b>untrusted</b> \u2014 because a buyer wrote it."],
+        [11.9, 18.6, "<b>P(instructions in text): 96.6%.</b> Nothing was posted \u2014 no refund, no payout, no journal."],
+        [18.9, 26.6, "It chose <b>4900 Refunds &amp; returns</b> at 43.8%, and shows 4000, 4100 and 6050 right behind it."],
+      ];
+      let text = caps[0][2], alpha = 0;
+      for (const [a, b, s] of caps) {
+        const p = PB.pulse(t, a, b, 0.24, 0.28);
+        if (p > alpha) { alpha = p; text = s; }
+      }
+      pb.setCaption(text, alpha);
+    };
+  </script>
+</body>
+</html>

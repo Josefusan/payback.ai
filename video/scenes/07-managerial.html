@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>07 — managerial</title>
+  <script src="../timeline.js"></script>
+</head>
+<body>
+  <script>
+    const pb = PB.mount({
+      total: window.FILM_TOTAL || 164,
+      offset: window.SCENE_OFFSET || 0,
+      labelIndex: "06",
+      labelText: "Budget vs actual",
+      topRight: "GET /api/reports/budget-variance",
+    });
+    const G = PB.GEO;
+
+    // Top of the managerial screen: the tie-out beside AR aging.
+    const dash = PB.frame("../captures/managerial-post.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 managerial",
+    });
+    // The budget report, straight from the ledger's own SQL.
+    const budget = PB.frame("../captures/budget-variance-after.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 budget vs actual 2026-10",
+    });
+    document.body.append(dash.el, budget.el);
+    document.body.appendChild(pb.node.cursor);
+
+    const DZ = 1.12, DX = -286 * DZ;                 // dash: the top two widgets
+    const BZ = 1.06, BX = -292 * BZ;                 // budget: the whole report column
+
+    window.seek = function (t) {
+      pb.setProgress(t);
+      pb.moveBg(t);
+      pb.node.top.style.opacity = "1";
+      pb.node.label.style.opacity = "1";
+
+      const toBudget = PB.smooth(PB.prog(t, 6.6, 7.4));
+      const backToDash = PB.smooth(PB.prog(t, 13.4, 14.2));
+      const aDash = (1 - toBudget) * (1 - backToDash) + backToDash;
+      const aBudget = toBudget * (1 - backToDash);
+      dash.el.style.opacity = String(aDash);
+      budget.el.style.opacity = String(aBudget);
+
+      // Phase 1 and 3 are both the managerial screen, but the second visit has moved down to the P&L.
+      const dashY = t < 14 ? -118 * DZ : -(690 * DZ);
+      dash.place(DX, dashY - PB.prog(t, 14.2, 20) * 30, DZ);
+      budget.place(BX, -96 * BZ - PB.prog(t, 7.4, 13.4) * 300, BZ);
+
+      budget.callout(292 * BZ + BX, 300 * BZ - 96 * BZ - PB.prog(t, 7.4, 13.4) * 300, 1370 * BZ, 900 * BZ,
+        "plan \u00b7 booked \u00b7 variance \u00b7 verdict", PB.pulse(t, 7.8, 13.2, 0.25, 0.3));
+      dash.callout(1094 * DZ + DX, 140 * DZ + dashY + (t >= 14 ? 0 : 0), 800 * DZ, 200 * DZ,
+        "AR aging", PB.pulse(t, 14.6, 19.6, 0.25, 0.3));
+
+      const caps = [
+        [0.4, 6.7, "For the owner, this is the screen they actually open: the month against plan, with variance in dollars and percent and a favourable or adverse flag."],
+        [7.1, 13.5, "Plan against booked \u2014 straight out of the ledger's own SQL. <b>No model produces a number on this screen.</b>"],
+        [13.9, 19.6, "Beside it, AR aging on the receivables the ledger actually carries, and contribution margin by product line."],
+      ];
+      let text = caps[0][2], alpha = 0;
+      for (const [a, b, s] of caps) { const p = PB.pulse(t, a, b, 0.22, 0.26); if (p > alpha) { alpha = p; text = s; } }
+      pb.setCaption(text, alpha);
+    };
+  </script>
+</body>
+</html>

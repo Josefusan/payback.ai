@@ -14,3 +14,7 @@ evals/out/
 
 # Written to the repo root by scripts/seed-sandbox.mjs when a sandbox checkout fails to complete.
 seed-approve-*.png
+
+# rendered film — 88 MB, delivered by upload not by git
+video/out/
+video/tmp/

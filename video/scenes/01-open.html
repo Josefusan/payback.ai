@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>01 — open</title>
+  <script src="../timeline.js"></script>
+</head>
+<body>
+  <script>
+    // No state outside the DOM; `seek` rebuilds the frame from t alone.
+    const DUR = window.SCENE_DURATION || 12;
+    const total = window.FILM_TOTAL || 164;
+
+    const pb = PB.mount({
+      total,
+      offset: window.SCENE_OFFSET || 0,
+      labelIndex: "00",
+      labelText: "Payback.ai",
+      topRight: "payback.clarktechventures.workers.dev",
+    });
+
+    const hero = document.createElement("div");
+    hero.className = "pb-layer pb-hero";
+    hero.innerHTML =
+      '<div class="pb-hero__eyebrow">An AI back office for PayPal</div>' +
+      '<h1 class="pb-hero__title">The agent does the <span>bookkeeping</span>.</h1>' +
+      '<p class="pb-hero__sub">It reads your PayPal activity, posts real double-entry books, and stops for a human whenever it is not sure.</p>';
+    document.body.appendChild(hero);
+
+    // The real Ledger screen, already booked, as the film's first piece of product footage.
+    const G = PB.GEO;
+    const ledger = PB.frame("../captures/ledger.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 ledger",
+    });
+    document.body.appendChild(ledger.el);
+    document.body.appendChild(pb.node.cursor); // keep the pointer above the frame
+
+    window.seek = function (t) {
+      pb.setProgress(t);
+      pb.moveBg(t);
+
+      // Chrome fades up over the first half second and then stays put.
+      const chrome = PB.smooth(PB.prog(t, 0.0, 0.6));
+      pb.node.top.style.opacity = chrome;
+      pb.node.label.style.opacity = chrome;
+
+      // Hero: in by 0.5 s, out between 3.2 s and 4.0 s.
+      const heroIn = PB.smooth(PB.prog(t, 0.15, 1.1));
+      const heroOut = 1 - PB.smooth(PB.prog(t, 3.3, 4.1));
+      const heroA = heroIn * heroOut;
+      hero.style.opacity = heroA;
+      hero.style.transform = `translateY(${(1 - heroIn) * 26 - (1 - heroOut) * 20}px) scale(${PB.lerp(0.985, 1, heroIn)})`;
+
+      // The ledger shot lifts into place and then drifts very slowly, so the frame is never dead.
+      const shotIn = PB.smooth(PB.prog(t, 3.7, 6.2));
+      ledger.el.style.opacity = shotIn;
+      const scale = PB.lerp(1.14, 1.0, PB.easeOut(PB.prog(t, 3.7, 6.6))) - PB.prog(t, 6.6, 12) * 0.02;
+      const lift = PB.lerp(58, 0, PB.easeOut(PB.prog(t, 3.7, 6.4)));
+      ledger.place(PB.lerp(-100, -68, PB.prog(t, 3.7, 12)), lift, scale * G.scale);
+
+      const capA = PB.pulse(t, 4.2, 12.0, 0.5, 0.6);
+      pb.setCaption(
+        "If you sell through PayPal, your books are a <b>weekend chore</b>. Payback.ai does the bookkeeping \u2014 through PayPal.",
+        capA,
+      );
+    };
+  </script>
+</body>
+</html>

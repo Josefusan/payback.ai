@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>04 — approve</title>
+  <script src="../timeline.js"></script>
+</head>
+<body>
+  <script>
+    const pb = PB.mount({
+      total: window.FILM_TOTAL || 164,
+      offset: window.SCENE_OFFSET || 0,
+      labelIndex: "03",
+      labelText: "The human decides",
+      topRight: "POST /api/review/5/resolve",
+    });
+    const G = PB.GEO;
+
+    // The decision form as it looked on screen while the reviewer filled it in.
+    const form = PB.frame("../captures/review-approve-form.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 item #5 \u2014 decision",
+    });
+    // …and the moment it was approved.
+    const done = PB.frame("../captures/review-approved.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 item #5 \u2014 decision",
+    });
+    const led = PB.frame("../captures/ledger-after.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 ledger",
+    });
+    document.body.append(form.el, done.el, led.el);
+    document.body.appendChild(pb.node.cursor);
+
+    const camF = PB.camera(form), camD = PB.camera(done), camL = PB.camera(led);
+    const Z = 1.15, X0 = 564;          // 1920 - 1560/1.15: rightmost origin that still fills the frame
+    const LED_Z = 1.0, LED_X0 = 0;
+
+    window.seek = function (t) {
+      pb.setProgress(t);
+      pb.moveBg(t);
+      pb.node.top.style.opacity = "1";
+      pb.node.label.style.opacity = "1";
+
+      const a1 = 1 - PB.smooth(PB.prog(t, 5.8, 6.5));
+      const a2 = PB.smooth(PB.prog(t, 5.8, 6.5)) * (1 - PB.smooth(PB.prog(t, 8.4, 9.1)));
+      const a3 = PB.smooth(PB.prog(t, 8.4, 9.1));
+      form.el.style.opacity = String(a1);
+      done.el.style.opacity = String(a2);
+      led.el.style.opacity = String(a3);
+
+      // A slow push over the decision pane, so the cut is not a freeze.
+      const yF = 430 + PB.prog(t, 0.4, 6.0) * 26;
+      camF.view(Z, X0, yF);
+      camD.view(Z, X0, 300);
+      camL.view(LED_Z, LED_X0, 400 + PB.prog(t, 9.0, 15) * 40);
+
+      // The override the reviewer chose, and then the banner the ledger answered with.
+      const r1 = camF.rect(Z, X0, yF, 645, 992, 1255, 46);
+      form.callout(r1.x, r1.y, r1.w, r1.h, "override \u2192 4000 Product revenue", PB.pulse(t, 0.8, 5.7, 0.2, 0.25));
+      const r2 = camD.rect(Z, X0, 300, 645, 560, 1255, 46);
+      done.callout(r2.x, r2.y, r2.w, r2.h, "posted", PB.pulse(t, 6.1, 8.3, 0.2, 0.25));
+      const r3 = camL.rect(LED_Z, LED_X0, 400 + PB.prog(t, 9.0, 15) * 40, 292, 624, 1010, 44);
+      led.callout(r3.x, r3.y, r3.w, r3.h, "approved by Joseph", PB.pulse(t, 9.4, 14.6, 0.18, 0.2));
+
+      // Pointer parks on the Approve control (which sits just below the captured fold) and clicks.
+      pb.cursorPath(t, [[1180, 700], [1050, 830], [1010, 862], [1010, 862]], {
+        start: 1.2, end: 5.4, opacity: a1, clickAt: [5.5, 5.62], rippleDur: 0.7,
+      });
+
+      const caps = [
+        [0.4, 5.7, "You decide. Override the account if you disagree \u2014 the model chose <b>4900 Refunds &amp; returns</b>; I correct it to <b>4000 Product revenue</b>."],
+        [6.1, 8.5, "Approved. The entry posts, and the trail records it as <b>my</b> decision \u2014 override and all."],
+        [8.9, 14.8, "The ledger takes it: a three-line entry, balanced to the cent, approved by a named human."],
+      ];
+      let text = caps[0][2], alpha = 0;
+      for (const [a, b, s] of caps) { const p = PB.pulse(t, a, b, 0.22, 0.26); if (p > alpha) { alpha = p; text = s; } }
+      pb.setCaption(text, alpha);
+    };
+  </script>
+</body>
+</html>

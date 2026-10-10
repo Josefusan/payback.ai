@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>08 — dial</title>
+  <script src="../timeline.js"></script>
+</head>
+<body>
+  <script>
+    const pb = PB.mount({
+      total: window.FILM_TOTAL || 164,
+      offset: window.SCENE_OFFSET || 0,
+      labelIndex: "07",
+      labelText: "The autonomy dial",
+      topRight: "PUT /api/settings/auto_post_threshold",
+    });
+    const G = PB.GEO;
+
+    const before = PB.frame("../captures/dial-before.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 autonomy dial",
+    });
+    const after = PB.frame("../captures/dial-set.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 autonomy dial",
+    });
+    const trail = PB.frame("../captures/audit-after-dial-full.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 audit trail",
+    });
+    document.body.append(before.el, after.el, trail.el);
+    document.body.appendChild(pb.node.cursor);
+
+    const Z = 1.55, X = -290 * Z + (1560 - 870 * Z) / 2, Y = -130 * Z + (745 - 290 * Z) / 2;
+    const TZ = 1.25, TX = -280 * TZ, TY = -830 * TZ;
+
+    window.seek = function (t) {
+      pb.setProgress(t);
+      pb.moveBg(t);
+      pb.node.top.style.opacity = "1";
+      pb.node.label.style.opacity = "1";
+
+      const aB = 1 - PB.smooth(PB.prog(t, 6.5, 7.2));
+      const aA = PB.smooth(PB.prog(t, 6.5, 7.2)) * (1 - PB.smooth(PB.prog(t, 10.8, 11.5)));
+      const aT = PB.smooth(PB.prog(t, 10.8, 11.5));
+      before.el.style.opacity = String(aB);
+      after.el.style.opacity = String(aA);
+      trail.el.style.opacity = String(aT);
+
+      before.place(X, Y - PB.prog(t, 0.4, 6.6) * 22, Z);
+      after.place(X, Y, Z);
+      trail.place(TX, TY - PB.prog(t, 11.5, 18) * 90, TZ);
+
+      // The dial: pointer walks to the slider, drags it up, releases.
+      pb.cursorPath(t, [[980, 690], [880, 470], [1096, 196], [1096, 196], [820, 196]], {
+        start: 0.8, end: 5.6, opacity: aB, clickAt: [2.9, 5.35], rippleDur: 0.65,
+      });
+
+      before.callout(296 * Z + X, 150 * Z + Y, 860 * Z, 250 * Z, "auto-post threshold", PB.pulse(t, 0.7, 2.6, 0.25, 0.3));
+      after.callout(296 * Z + X, 216 * Z + Y, 860 * Z, 108 * Z, "the sweep at 95%", PB.pulse(t, 7.0, 10.7, 0.25, 0.3));
+      trail.callout(300 * TZ + TX, 1000 * TZ + TY - PB.prog(t, 11.5, 18) * 90, 1220 * TZ, 118 * TZ,
+        "setting row: 0.9 \u2192 0.95", PB.pulse(t, 12.2, 17.6, 0.25, 0.3));
+
+      const caps = [
+        [0.4, 6.4, "And the one control that decides how much the agent may do alone. I tighten it, and commit the change."],
+        [6.8, 10.9, "The sweep answers what it would change \u2014 auto-posted, precision when auto, sent to a human \u2014 over <b>2 judged transactions</b>. A small sample is not evidence, so the count is on screen."],
+        [11.3, 17.6, "Setting it writes a <b>setting</b> row to the hash chain: the history of who loosened or tightened the agent's authority."],
+      ];
+      let text = caps[0][2], alpha = 0;
+      for (const [a, b, s] of caps) { const p = PB.pulse(t, a, b, 0.2, 0.24); if (p > alpha) { alpha = p; text = s; } }
+      pb.setCaption(text, alpha);
+    };
+  </script>
+</body>
+</html>

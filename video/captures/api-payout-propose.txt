@@ -1,0 +1,2 @@
+curl -sS -X POST https://payback.clarktechventures.workers.dev/api/actions/propose -H 'content-type: application/json' -H "x-admin-token: $PAYBACK_ADMIN_TOKEN" -d '{"proposal":{"type":"payout","bill_id":"BILL-1043","receiver":"sam.ortiz@example.com","amount_cents":250000},"context":"Invoice 1043 from Sam Ortiz, due this week"}'
+{"ok":false,"id":17,"outcome":"review","policy_rule":"payout_over_autonomous_limit","paypal_ref":null,"error":null}

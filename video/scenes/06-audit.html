@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>06 — audit</title>
+  <script src="../timeline.js"></script>
+  <script src="../terminals.js"></script>
+</head>
+<body>
+  <script>
+    const pb = PB.mount({
+      total: window.FILM_TOTAL || 164,
+      offset: window.SCENE_OFFSET || 0,
+      labelIndex: "05",
+      labelText: "The hash-chained trail",
+      topRight: "GET /api/audit",
+    });
+    const G = PB.GEO;
+    const S = G.scale;
+
+    const audit = PB.frame("../captures/audit-after-dial-full.png", {
+      left: G.left, top: G.top, width: G.width, height: G.height, url: "payback.clarktechventures.workers.dev \u2014 audit trail",
+    });
+    document.body.appendChild(audit.el);
+
+    // The verification result, verbatim, as a picture-in-picture readout.
+    const T = window.PB_TERMS["api-audit-verify"];
+    const pip = document.createElement("div");
+    pip.className = "pb-layer pb-term";
+    pip.style.cssText = "left:1128px; top:690px; width:612px; box-shadow:0 30px 90px rgba(0,0,0,.75)";
+    pip.innerHTML =
+      '<div class="pb-term__bar"><span class="pb-dot"></span><span class="pb-dot"></span><span class="pb-dot"></span>' +
+      '<span class="pb-term__title">' + PB.esc(T.cmd) + "</span></div>" +
+      `<div class="pb-term__body" style="font-size:22px"><span class="pb-out--ok">${PB.esc(T.out)}</span>`;
+    document.body.appendChild(pip);
+    document.body.appendChild(pb.node.cursor);
+
+    window.seek = function (t) {
+      pb.setProgress(t);
+      pb.moveBg(t);
+      pb.node.top.style.opacity = "1";
+      pb.node.label.style.opacity = "1";
+
+      // Travel the whole trail: the story first, then the chain table and its head.
+      const panY = PB.lerp(0, 1106, PB.easeInOut(PB.prog(t, 1.2, 15.0)));
+      audit.place(0, panY, S);
+
+      // Ring the verification badge while the caption names the verdict.
+      const badge = PB.pulse(t, 0.6, 5.4, 0.2, 0.25);
+      audit.callout(506 * S, 44 * S, 200 * S, 40 * S, "GET /api/audit/verify", badge);
+
+      // The hash columns are the evidence, so ring them once they scroll into view.
+      const hashes = PB.pulse(t, 7.4, 12.4, 0.22, 0.25);
+      audit.callout(1180 * S, 1520 * S + panY, 420 * S, 300 * S, "prev \u2192 hash", hashes);
+
+      const pipA = PB.smooth(PB.prog(t, 12.6, 13.4));
+      pip.style.opacity = String(pipA);
+      pip.style.transform = `translateY(${(1 - pipA) * 18}px)`;
+
+      const caps = [
+        [0.4, 6.4, "Every step is on a hash-chained trail: the agent's postings, my approval, and the PayPal call."],
+        [6.8, 12.6, "Each row's hash covers its own contents <b>and</b> the row before it \u2014 so altering history breaks every hash after it."],
+        [13.0, 17.6, "Recomputing the chain names the first row that fails. Right now: <b>Chain intact</b>."],
+      ];
+      let text = caps[0][2], alpha = 0;
+      for (const [a, b, s] of caps) { const p = PB.pulse(t, a, b, 0.22, 0.26); if (p > alpha) { alpha = p; text = s; } }
+      pb.setCaption(text, alpha);
+    };
+  </script>
+</body>
+</html>

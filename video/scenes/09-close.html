@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>09 — close</title>
+  <script src="../timeline.js"></script>
+</head>
+<body>
+  <script>
+    const pb = PB.mount({
+      total: window.FILM_TOTAL || 164,
+      offset: window.SCENE_OFFSET || 0,
+      labelIndex: "08",
+      labelText: "Payback.ai",
+      topRight: "payback.clarktechventures.workers.dev",
+    });
+
+    const hero = document.createElement("div");
+    hero.className = "pb-layer pb-hero";
+    hero.innerHTML =
+      '<div class="pb-hero__eyebrow">The agent does the bookkeeping</div>' +
+      '<h1 class="pb-hero__title">Payback<span>.ai</span></h1>' +
+      '<p class="pb-hero__sub">The audit trail is what makes a controller let an agent near the books.</p>' +
+      '<p style="margin-top:44px;font-family:var(--mono);font-size:17px;letter-spacing:.14em;color:var(--subtle)">' +
+      "payback.clarktechventures.workers.dev \u00b7 PayPal sandbox \u00b7 no music, captions burned in</p>";
+    document.body.appendChild(hero);
+    document.body.appendChild(pb.node.cursor);
+
+    window.seek = function (t) {
+      pb.setProgress(t);
+      pb.moveBg(t);
+      const chrome = PB.smooth(PB.prog(t, 0.0, 0.7));
+      pb.node.top.style.opacity = String(chrome);
+      pb.node.label.style.opacity = String(chrome);
+
+      const a = PB.smooth(PB.prog(t, 0.2, 1.6));
+      hero.style.opacity = String(a);
+      hero.style.transform = `translateY(${(1 - a) * 24}px) scale(${PB.lerp(0.985, 1, a)})`;
+      pb.node.cursor.style.opacity = "0";
+
+      pb.setCaption("Payback.ai \u2014 the agent does the bookkeeping; the audit trail is what makes a controller let it.", PB.pulse(t, 0.9, 8.0, 0.2, 0.3));
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>05 — actions</title>
+  <script src="../timeline.js"></script>
+  <script src="../terminals.js"></script>
+</head>
+<body>
+  <script>
+    const pb = PB.mount({
+      total: window.FILM_TOTAL || 164,
+      offset: window.SCENE_OFFSET || 0,
+      labelIndex: "04",
+      labelText: "The agent refuses",
+      topRight: "POST /api/actions/propose",
+    });
+
+    // `terminals.js` is generated from the raw capture files: every character below came back from the
+    // deployed Worker, not from this file.
+    const T = window.PB_TERMS;
+
+    const P = { left: 200, width: 1520, top: 262 };
+
+    function panel(term, title) {
+      const el = PB.terminal({ left: P.left, top: P.top, width: P.width, title });
+      document.body.appendChild(el.el);
+      return el;
+    }
+
+    const pA = panel(null, "zsh \u2014 the refund the payment asked for");
+    const pB = panel(null, "zsh \u2014 a vendor bill over the autonomous limit");
+    const pC = panel(null, "zsh \u2014 the human approves it");
+
+    // The closing receipt: three real verdicts, copied from the three real response bodies.
+    const receipt = document.createElement("div");
+    receipt.className = "pb-layer";
+    receipt.style.cssText = `left:${P.left}px; top:300px; width:${P.width}px;`;
+    receipt.innerHTML = `
+      <div class="pb-term" style="font-family:var(--mono)">
+        <div class="pb-term__bar"><span class="pb-dot"></span><span class="pb-dot"></span><span class="pb-dot"></span>
+          <span class="pb-term__title">what the policy gate did with each proposal</span></div>
+        <div class="pb-term__body" style="font-size:19px">
+          <div style="display:flex;gap:18px;align-items:baseline;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07)">
+            <span style="color:var(--bad)">refund</span><span style="color:var(--muted)">$5,000</span>
+            <span style="color:var(--bad)">blocked</span><span style="color:#ff9c8f">refund_over_hard_cap</span></div>
+          <div style="display:flex;gap:18px;align-items:baseline;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07)">
+            <span style="color:var(--warn)">payout</span><span style="color:var(--muted)">$2,500</span>
+            <span style="color:var(--warn)">review</span><span style="color:#ffd479">payout_over_autonomous_limit</span></div>
+          <div style="display:flex;gap:18px;align-items:baseline;padding:9px 0">
+            <span style="color:var(--ok)">payout</span><span style="color:var(--muted)">$2,500</span>
+            <span style="color:var(--ok)">executed</span><span style="color:#7ee7c7">5LLP4WLVWXCWA</span></div>
+        </div>
+      </div>`;
+    document.body.appendChild(receipt);
+    document.body.appendChild(pb.node.cursor);
+
+    const CMD_CLS = "pb-cmd";
+    /** Reveal a captured command / response progressively; the text itself is never rewritten. */
+    function reveal(term, cmd, out, t, tCmd, tOut, outCls) {
+      const n = Math.round(PB.prog(t, tCmd, tCmd + 2.0) * cmd.length);
+      const o = PB.prog(t, tOut, tOut + 0.9);
+      const caret = t < tCmd + 2.2 ? '<span style="color:var(--accent)">\u2588</span>' : "";
+      term.bodyInfo.innerHTML =
+        `<span class="${CMD_CLS}"><span class="pb-cmd__prompt">$ </span>${PB.esc(cmd.slice(0, n))}</span>${caret}` +
+        (o > 0 ? `\n<span class="${outCls}" style="opacity:${o.toFixed(3)}">${PB.esc(out)}</span>` : "");
+    }
+
+    /** The single JSON line a response body is, coloured by the outcome it reports. */
+    function clsFor(raw) {
+      try {
+        const j = JSON.parse(raw);
+        if (j.outcome === "blocked") return "pb-out--bad";
+        if (j.outcome === "review") return "pb-out--warn";
+        if (j.outcome === "executed" || j.ok === true) return "pb-out--ok";
+      } catch { /* not JSON: leave it unstyled */
+      }
+      return "pb-out--ok";
+    }
+
+    window.seek = function (t) {
+      pb.setProgress(t);
+      pb.moveBg(t);
+      pb.node.top.style.opacity = "1";
+      pb.node.label.style.opacity = "1";
+
+      const aA = 1 - PB.smooth(PB.prog(t, 9.0, 9.6));
+      const aB = PB.smooth(PB.prog(t, 9.0, 9.6)) * (1 - PB.smooth(PB.prog(t, 15.9, 16.5)));
+      const aC = PB.smooth(PB.prog(t, 15.9, 16.5)) * (1 - PB.smooth(PB.prog(t, 21.2, 21.9)));
+      const aR = PB.smooth(PB.prog(t, 21.2, 21.9));
+      pA.el.style.opacity = String(aA);
+      pB.el.style.opacity = String(aB);
+      pC.el.style.opacity = String(aC);
+      receipt.style.opacity = String(aR * 0.999);
+
+      reveal(pA, T["api-refund-propose"].cmd, T["api-refund-propose"].out, t, 0.5, 3.1, clsFor(T["api-refund-propose"].out));
+      reveal(pB, T["api-payout-propose"].cmd, T["api-payout-propose"].out, t, 9.5, 11.9, clsFor(T["api-payout-propose"].out));
+      reveal(pC, T["api-payout-approve"].cmd, T["api-payout-approve"].out, t, 16.4, 18.5, clsFor(T["api-payout-approve"].out));
+
+      // The payout reference is the one thing on this screen that moved money.
+      const ringA = PB.pulse(t, 18.9, 21.0, 0.25, 0.3);
+      if (ringA > 0) {
+        if (!pC.el.querySelector(".pb-callout")) {
+          const box = document.createElement("div");
+          box.className = "pb-callout";
+          pC.el.querySelector(".pb-term__body").appendChild(box);
+        }
+        const box = pC.el.querySelector(".pb-callout");
+        box.style.cssText = `left:6px; top:112px; width:660px; height:52px; opacity:${ringA}`;
+      } else {
+        const box = pC.el.querySelector(".pb-callout");
+        if (box) box.style.opacity = "0";
+      }
+
+      const caps = [
+        [0.5, 8.9, "The payment told the agent to refund $5,000. It proposed the refund \u2014 and its own policy refused it."],
+        [9.3, 15.8, "No model output can raise a hard cap. PayPal was never called: <b>paypal_ref null</b>."],
+        [16.3, 21.1, "A real vendor bill over the limit is the other outcome: proposed, queued, waiting for a human."],
+        [21.6, 25.7, "I approve it \u2014 and the sandbox payout batch executes."],
+      ];
+      let text = caps[0][2], alpha = 0;
+      for (const [a, b, s] of caps) { const p = PB.pulse(t, a, b, 0.22, 0.26); if (p > alpha) { alpha = p; text = s; } }
+      pb.setCaption(text, alpha);
+    };
+  </script>
+</body>
+</html>

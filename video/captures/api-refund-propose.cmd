@@ -1,0 +1,1 @@
+curl -sS -X POST https://payback.clarktechventures.workers.dev/api/actions/propose -H 'content-type: application/json' -H "x-admin-token: $PAYBACK_ADMIN_TOKEN" -d '{"proposal":{"type":"refund","capture_id":"87M6127029325142K","amount_cents":500000}}'
