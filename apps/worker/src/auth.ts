@@ -12,6 +12,20 @@ import type { AppEnv } from "./env";
 
 export const ADMIN_TOKEN_HEADER = "x-admin-token";
 
+/**
+ * True when a caller-supplied string is the shared admin secret.
+ *
+ * Used to refuse an actor name that is the token itself. This is defence in depth against a client bug:
+ * the audit chain is append-only and `GET /api/audit` is deliberately unauthenticated, so a secret
+ * written into an `actor` column could never be deleted and would be readable by anyone. The UI no longer
+ * sends the token, but the worker must not depend on the UI being correct — one buggy client would
+ * permanently poison the trail.
+ */
+export function isAdminSecret(env: AppEnv["Bindings"], value: string): boolean {
+  const expected: unknown = env.ADMIN_TOKEN;
+  return typeof expected === "string" && expected.trim() !== "" && value.trim() === expected.trim();
+}
+
 /** Length-safe constant-time comparison, so a near-miss token cannot be distinguished by timing. */
 function timingSafeEqual(a: string, b: string): boolean {
   const aBytes = new TextEncoder().encode(a);

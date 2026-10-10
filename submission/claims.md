@@ -8,6 +8,16 @@
   **reworded/removed** (T-L5-002) or **scheduled** to the task that will produce the evidence (plan §4).
   INV-7 / Rules §4: never claim what does not run.
 
+> **LATEST STATUS — 2026-10-11 (read §8).** Sections §1–§7 are the ledger as it stood on
+> 2026-10-06/08/09 and are kept as history; where they conflict with the build, **§8 wins**. As of
+> 2026-10-11 these are **BUILT** (a claim of their absence is now false): the **autonomy dial**
+> (`GET|PUT /api/settings/auto_post_threshold`, `GET /api/confidence/sweep`, `0004_settings.sql`,
+> `ConfidenceDial`), the **webhook → transaction mapping**, and the **budget-variance report**
+> (`GET /api/reports/budget-variance`, `0005_budgets.sql`, `BudgetVariance`). Still **NOT built**, and
+> present in no current claim text: a **cash forecast / cash-flow view**, a **"Controller agent"**,
+> PayPal **Agent Toolkit / MCP**, the **AI-Toolkit** plugin, and **APIMatic**; and **no invoice reminder or
+> dispute triage has executed** (only a refund and a payout have).
+
 ## How to read this file
 
 - **Evidence** = a repo path `file:line`, or a command whose output lands in `evals/out/*.json`.
@@ -191,5 +201,118 @@ it. Evidence below is live against `https://payback.clarktechventures.workers.de
 | Devpost text (`devpost-description.md`) | C-DEV-01…C-DEV-12 — still the 2026-10-05 draft; needs the same line-by-line pass §6/§7 gave the README |
 | Repo still **PRIVATE** | Submission requires public; `decisions.md` reads "private until submission week, then public" — a deliberate choice, not an oversight |
 | C-README-16/17/18 (Agent Toolkit / AI-Toolkit / APIMatic) | Still no code reference; integrate or delete before submission |
+
+## 8. Re-audit — 2026-10-11 (dial built; webhooks mapped; budget variance built) — supersedes §6–§7 where they conflict
+
+§7 closed the largest integrity gaps by *cutting* the dial and keeping it off camera. That is now
+**superseded**: the dial was built, along with webhook→ledger mapping and the budget-variance report. Every
+row below re-verifies a claim against the code; evidence is in-tree and live against
+`https://payback.clarktechventures.workers.dev`.
+
+### New claims introduced by the 2026-10-11 build (all BACKED)
+
+| id | Claim | Evidence |
+|---|---|---|
+| C-N-11 | The autonomy dial is live: read it, turn it (clamped to `[0.80, 0.99]`), and see what moving it would change | `apps/worker/migrations/0004_settings.sql`; `apps/worker/src/routes/settings.ts`; `apps/worker/src/settings.ts` (`getThresholdSetting`, `setThreshold`, `confidenceSweep`); `GET\|PUT /api/settings/auto_post_threshold`; `GET /api/confidence/sweep`; `apps/web/src/components/ConfidenceDial.tsx` |
+| C-N-12 | Turning the dial writes a `setting` row to the hash-chained audit log, in the same batch as the write | `src/settings.ts` `setThreshold` → `env.DB.batch([…settings upsert…, auditInsert(buildAuditRow({ref_type:"setting", event:"changed"}))])`; `0003_audit.sql` reserves `ref_type` `'setting'` |
+| C-N-13 | The decision path reads the stored threshold, falling back to the `AUTO_POST_THRESHOLD` var | `src/settings.ts` `effectiveThreshold` (try/catch → `defaultThreshold`); `wrangler.jsonc` `AUTO_POST_THRESHOLD: "0.90"` |
+| C-N-14 | Webhooks are no longer recorded-then-dropped: a capture/refund/payout webhook books through the same path a sync uses | `apps/worker/src/pipeline.ts` `mapWebhookToTxn`, `processWebhookEvent`, and `handleSyncBatch` routing `kind:"webhook"` |
+| C-N-15 | A capture does one extra Orders v2 GET for the buyer's text; an unreadable order routes to a human, not a blind post | `pipeline.ts` `mapWebhookToTxn` → `new PayPalClient(env).getOrder(orderId)`; `BuyerTextUnreadableError` → review queue (`buyer_text_unreadable`) |
+| C-N-16 | Budget vs actual variance is a real report, computed from the ledger, and a budget line can be set from the dashboard (admin-gated; writes a `setting` audit row in the same batch) | `apps/worker/migrations/0005_budgets.sql`; `apps/worker/src/budget.ts` (`budgetVariance`, `setBudgetLine`); `GET /api/reports/budget-variance` and `PUT /api/budgets` (`routes/reports.ts`); `apps/web/src/components/BudgetVariance.tsx` + `BudgetEntry.tsx` (mounted in `ManagerialDashboard.tsx`); `apps/web/src/data/budgets.ts` |
+| C-N-17 | Test state | 197 worker tests, 119 web tests, both typechecks clean; `python3 evals/checks.py` → **0 hard failures, 3 pending** (`evals/out/checks.json`) |
+| C-N-18 | A budget line can be set from the dashboard; the write is admin-gated and records a `setting` audit row in the same batch | `PUT /api/budgets` (`routes/reports.ts`, `requireAdmin`); `apps/worker/src/budget.ts` `setBudgetLine` (`event:"budget_set"`); `apps/web/src/components/BudgetEntry.tsx` (mounted in `ManagerialDashboard.tsx`); `apps/web/src/data/budgets.ts` |
+
+### Claim-by-claim status (§1–§3 re-verified 2026-10-11)
+
+The README and the Devpost draft were rewritten between §7 and now; where a claim's *text* changed, the row
+says so. Rows with no note are unchanged from §6/§7.
+
+**§1 README claims**
+
+| id | Status 2026-10-11 | Note |
+|---|---|---|
+| C-README-01 | BACKED | README text since rewritten to "We only document what works." |
+| C-README-02 | **BACKED** (was PARTIAL) | Webhooks now map to ledger rows (C-N-14); Transaction Search + Balances live. |
+| C-README-03 | **REWORDED** | "Calibrated probabilities" dropped — README now says "a probability the reviewer can see". Product eval ECE ~0.20 vs 0.05 ceiling, so "calibrated" is not claimable. |
+| C-README-04 | **BACKED** (was PARTIAL) | Tie-out reached `ok:true`, `diffCents:0`. |
+| C-README-05 | **BACKED for refunds + payouts; PARTIAL** for reminders/disputes | README now says explicitly that only refunds and payouts have executed. |
+| C-README-06 | **CORRECTED** | "cash forecast" and "AG Studio" removed; contribution margin (`PnLByProductLine`) and AR aging (derived) are built. README now carries the honest gap: "No cash-flow or working-capital view." |
+| C-README-07…13 | BACKED | KEEP. |
+| C-README-14 | **BACKED (built)** | AG Grid is load-bearing, not "planned"; AG Studio is still absent (its `assets.md` row was dropped). |
+| C-README-15 | BACKED | KEEP. |
+| C-README-16 | **REMOVED** | No PayPal Agent Toolkit / MCP in code or README (only `.mcp.json` and skill notes, which are dev tooling, not the runtime). |
+| C-README-17 | **REMOVED** | No AI-Toolkit plugin in code. |
+| C-README-18 | **REMOVED** | No APIMatic-generated client; PayPal is hand-written `fetch` (`src/paypal.ts`). |
+| C-README-19 | **RESOLVED** | AG Grid built; AG Studio not used. |
+| C-README-20 | BACKED with caveat | `docs/09-architecture.md` still names target components (Workflows close, "Controller agent", remote MCP) that are **not built**; it is a target diagram. |
+| C-README-21 | **BACKED** | `npm test` passes (197 worker / 119 web). README's "Testing" line still reads 166/103 — stale, and README is not this file. |
+| C-README-22 | **BACKED** | Hosted URL live; admin token supplied via the Devpost testing-access field. |
+| C-README-23 | PENDING | `submission/video.json` = `PLACEHOLDER`; `evals/checks.py` reports `video` + `readme_demo_video` pending. |
+| C-README-24 | BACKED | `evals/out/product.json` now exists. |
+| C-README-25 | BACKED | KEEP. |
+| C-README-26 | BACKED | KEEP. |
+
+**§2 Devpost claims** — the file was rewritten 2026-10-11 (`submission/devpost-description.md`).
+
+| id | Status 2026-10-11 | Note |
+|---|---|---|
+| C-DEV-01 | BACKED | KEEP. |
+| C-DEV-02 | **BACKED** | As C-README-02. |
+| C-DEV-03 | **CORRECTED** | No "calibrated" in the rewrite. |
+| C-DEV-04 | **BACKED** | As C-README-04. |
+| C-DEV-05 | **CORRECTED** | Only refunds and payouts have executed; stated as such. |
+| C-DEV-06 | **REMOVED** | "Controller agent" and "cash forecast" are gone; the rewrite lists them under "Explicitly not built". |
+| C-DEV-07 | **REWRITTEN** | Inspiration is a qualitative problem statement; no unattributable time-saved statistic is claimed. |
+| C-DEV-08 | **REWRITTEN** | "Who it's for" names sellers plus their bookkeeper/controller. |
+| C-DEV-09 | **REWRITTEN** | Architecture in words, plus a built-vs-target note pointing at `docs/09-architecture.md`. |
+| C-DEV-10 | **REWRITTEN** | Complete tools table; the Agent Toolkit / MCP, AI-Toolkit and APIMatic rows are deleted. |
+| C-DEV-11 | BACKED | KEEP. |
+| C-DEV-12 | **REWRITTEN** | Accomplishments cite measured numbers (tie-out, 0.966, `PKMU7VDGVCP8Q`, test counts) and name the shortfalls. |
+| C-DEV-13 | **REWRITTEN** | Testing instructions now include the admin-token guidance (`x-admin-token`, `ADMIN_TOKEN`). |
+
+**§3 video claims** (plan rewritten 2026-10-11)
+
+| id | Status 2026-10-11 | Note |
+|---|---|---|
+| C-VID-01 | **BACKED** | Tie-out to the cent observed. |
+| C-VID-02 | **BACKED** (was UNBACKED) | The dial is built; a dial beat and a budget-variance beat were added to `docs/11-demo-video-plan.md`. |
+| C-VID-03 | **BACKED for refunds + payouts** | As C-README-05. |
+| C-VID-04 | **BACKED** | Injection guard fired live at 0.966; the refund was policy-blocked. |
+| C-VID-05 | UNBACKED | Month-end close / "Controller agent" still absent; still under "Do not claim on camera". |
+| C-VID-06 | **BACKED** | AG Grid present and load-bearing. |
+
+**§6/§7 claims of ABSENCE — all now REVERSED** (a claim of absence is as checkable as a claim of presence)
+
+| id | Claimed absent | 2026-10-11 |
+|---|---|---|
+| C-NA-01 | Hash-chained audit trail | **Reversed** — built (C-N-11/C-N-12 family; `0003_audit.sql`, `/api/audit`, `/api/audit/verify` `{"ok":true}`). |
+| C-NA-02 | Autonomy dial | **Reversed** — built (C-N-11). §7's "still absent, now by decision" is superseded. |
+| C-NA-03 | `GET /api/confidence/sweep` | **Reversed** — returns 200 (`routes/settings.ts`). |
+| C-NA-04 | Webhook → transaction booking | **Reversed** — built (C-N-14). "recorded then dropped" is no longer true. |
+| C-NA-05 | Actions have ever executed | **Reversed** — a payout executed (`PKMU7VDGVCP8Q`). |
+
+**C-N-01…C-N-10** (introduced in §6/§7) remain **BACKED**, unchanged.
+
+### Corrections applied to the ledger across §1–§7
+
+- §6 – "C-NA-01 … no `audit_log` table … endpoints 404" → **false**; built (§1.5 of the roadmap).
+- §7 – "the autonomy dial was **cut** from the pitch … the endpoint still 404s, and that is now the
+  documented position" → **false**; the dial is built (C-N-11/C-N-12). Any "cut deliberately" wording is
+  superseded.
+- §6 / §0 – webhooks "recorded then dropped" (C-NA-04) → **false**; webhooks book (C-N-14).
+- C-README-06 / C-DEV-06 – "cash forecast" and "Controller agent" → **removed from both docs**.
+- C-README-16/17/18 and C-DEV-10 – PayPal "Agent Toolkit / MCP", "AI-Toolkit", "APIMatic" → **removed**; no
+  code reference ever existed.
+- §4 worklist / §7 – "T-L3-005, T-L4-005 … Controller agent demoed" and C-VID-05 → **not attempted**; the
+  claim is dropped, not scheduled.
+
+### Still open before G5
+
+| Item | Blocking |
+|---|---|
+| Video (`submission/video.json` = PLACEHOLDER) | C-README-23, C-DEV-13 — the script is honest and recordable; the recording is outstanding |
+| Repo still **PRIVATE** | Submission requires public; `decisions.md` reads "private until submission week, then public" |
+| README test-count line (166/103) | Stale vs 197 worker / 119 web; README is not owned by this ledger |
+| README "Budgets are seeded, not entered … no screen for entering next month's plan" | **Stale** — `BudgetEntry` is mounted on the managerial dashboard and `PUT /api/budgets` is live (C-N-16/C-N-18); README is not owned by this ledger |
 
 

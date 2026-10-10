@@ -202,6 +202,36 @@ export interface BudgetVarianceResponse {
   totals: BudgetVarianceTotals;
 }
 
+/**
+ * One budget line: the plan for one account in one period.
+ *
+ * `amount_cents` uses the SAME natural-magnitude convention as `BudgetVarianceRow` (revenue as earned,
+ * cost as spent), so a plan entered here is directly comparable to the actuals with no sign flip — the
+ * write path stores the figure the variance report reads back.
+ */
+export interface BudgetLine {
+  period: string; // YYYY-MM
+  account_code: string;
+  amount_cents: Cents; // natural magnitude, see BudgetVarianceRow
+  note: string | null;
+}
+
+/**
+ * `PUT /api/budgets` — set or replace the plan for one account in one month. Admin-gated.
+ *
+ * A budget is a plan, and a change to the plan is exactly the kind of decision a controller wants
+ * attributed, so each accepted write appends one hash-chained `audit_log` row.
+ */
+export interface BudgetPutRequest {
+  period: string; // YYYY-MM
+  account_code: string;
+  amount_cents: Cents; // natural magnitude; a finite, non-negative integer
+  by: string; // who is setting the plan; recorded as the audit actor
+  note?: string | null;
+}
+
+export type BudgetPutResponse = BudgetLine;
+
 // ── Registry: one row per endpoint, consumed by the fixture test and the Postman collection ──
 export type Lane = "INT" | "L1" | "L2" | "L3";
 export interface Endpoint { method: "GET" | "POST" | "PUT"; path: string; lane: Lane; fixture: string; shape: "array" | "object" }
@@ -225,6 +255,7 @@ export const ENDPOINTS: readonly Endpoint[] = [
   { method: "GET", path: "/api/reconcile", lane: "L3", fixture: "reconcile", shape: "array" },
   { method: "GET", path: "/api/reports/pnl", lane: "L3", fixture: "reports-pnl", shape: "array" },
   { method: "GET", path: "/api/reports/budget-variance", lane: "L3", fixture: "reports-budget-variance", shape: "object" },
+  { method: "PUT", path: "/api/budgets", lane: "L3", fixture: "budgets-put", shape: "object" },
   { method: "GET", path: "/api/audit", lane: "L3", fixture: "audit", shape: "object" },
   { method: "GET", path: "/api/audit/verify", lane: "L3", fixture: "audit-verify", shape: "object" },
   { method: "POST", path: "/api/close", lane: "L3", fixture: "close", shape: "object" },

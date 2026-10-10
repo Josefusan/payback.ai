@@ -133,6 +133,14 @@ reversal entry, never an edit. Approving a contested item records a named human 
    it. `GET /api/audit/verify` recomputes the chain and names the first row that fails. The trail reads
    openly — checking it controls nothing.
 
+5. **An autonomy dial the controller holds.** The confidence the agent needs before it may book without a
+   human lives in D1 (`GET|PUT /api/settings/auto_post_threshold`), not in a deploy-time variable, so
+   turning it takes effect on the very next transaction. `GET /api/confidence/sweep` answers the question
+   that has to come first — what would change at each threshold — from decisions real people have judged,
+   reported with its sample size so a perfect precision over three items cannot be mistaken for evidence.
+   Every turn is appended to the audit chain, so the history of who loosened or tightened the agent's
+   authority is tamper-evident.
+
 ## What is NOT built yet
 
 We only document what works, so here is the other half of the ledger.
@@ -148,9 +156,15 @@ Still unfinished, with the reason:
   ledger), but opening cash, cash in/out and closing position are not presented as their own report.
 - **Dimensions stop at product line.** Management accounting wants customer, vendor, project and period on
   the lines; only `product_line` and `counterparty` exist today.
-- **Budgets are seeded, not entered.** `GET /api/reports/budget-variance` is real and computed from the
-  ledger, but there is no screen for entering next month's plan — the demo company's budgets ship in
+- **Budgets ship seeded, but can now be entered.** `GET /api/reports/budget-variance` is real and computed
+  from the ledger, and the managerial screen carries a `BudgetEntry` form (`PUT /api/budgets`) so a
+  controller can set next month's plan without a redeploy. The demo company's starting budgets come from
   `migrations/0005_budgets.sql`.
+- **Dispute triage cannot complete.** Everything up to PayPal works — the proposal, the deterministic gate
+  (`dispute_acceptance_needs_human`), the human approval, the idempotency key — but `callPayPal` has no
+  executor for `dispute_accept`, so an approved dispute ends `outcome: failed` with
+  `no_paypal_executor:dispute_accept`. We found this by running it. Nothing about the sandbox dispute
+  changes.
 
 ## Architecture
 
@@ -265,8 +279,8 @@ that no video backed. An unearned green tick is worse than an honest pending one
 ## Testing
 
 ```bash
-cd apps/worker && npm test      # 166 tests
-cd apps/web && npm test         # 103 tests
+cd apps/worker && npm test      # 207 tests
+cd apps/web && npm test         # 126 tests
 ```
 
 The audit tests are mostly attacks — edit a row, rewrite an actor to hide who approved something, delete a

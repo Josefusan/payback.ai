@@ -1,7 +1,7 @@
 // Owner: L4 — T-L4-004. The route holds no SQL; src/settings.ts owns the statements and the audit row.
 import { Hono, type Context } from "hono";
 import type { ConfidenceSweepResponse, ThresholdSetting } from "../../../../packages/contracts/api";
-import { requireAdmin } from "../auth";
+import { isAdminSecret, requireAdmin } from "../auth";
 import type { AppEnv } from "../env";
 import { confidenceSweep, getThresholdSetting, setThreshold } from "../settings";
 
@@ -36,6 +36,10 @@ settings.put("/api/settings/auto_post_threshold", async (c) => {
     return c.json({ error: "invalid_value", detail: "value must be a finite number" }, 400);
   }
   if (typeof by !== "string" || by.trim() === "") return c.json({ error: "actor_required" }, 400);
+  // Never let the shared secret become an audit actor — see isAdminSecret.
+  if (isAdminSecret(c.env, by)) {
+    return c.json({ error: "invalid_actor", detail: "actor must be a name, not the admin token" }, 400);
+  }
 
   // Out-of-range values are clamped, not rejected: the response reports what was actually set, and the
   // audit row records both the request and the clamp, so a clamped turn is visible rather than silent.

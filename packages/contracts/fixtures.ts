@@ -3,6 +3,7 @@ import actions from "./fixtures/actions.json";
 import actionsApprove from "./fixtures/actions-approve.json";
 import audit from "./fixtures/audit.json";
 import auditVerify from "./fixtures/audit-verify.json";
+import budgetsPut from "./fixtures/budgets-put.json";
 import close from "./fixtures/close.json";
 import coa from "./fixtures/coa.json";
 import confidenceSweep from "./fixtures/confidence-sweep.json";
@@ -25,6 +26,7 @@ export const FIXTURES: Record<string, unknown> = {
   "actions-approve": actionsApprove,
   "audit": audit,
   "audit-verify": auditVerify,
+  "budgets-put": budgetsPut,
   "close": close,
   "coa": coa,
   "confidence-sweep": confidenceSweep,

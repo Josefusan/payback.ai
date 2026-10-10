@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { BUDGET_VARIANCE_PATH, LEDGER_PATH, loadBudgetVariance, loadLedger, loadPnl, loadReconcile, PNL_PATH, RECONCILE_PATH, useLive } from "../data/api";
 import { deriveARAging, EMPTY_BUDGET_VARIANCE, pnlByProductLine, receivableSourceLines } from "../data/reports";
 import { ARAgingWidget } from "./ARAgingWidget";
+import { BudgetEntry } from "./BudgetEntry";
 import { BudgetVariance } from "./BudgetVariance";
 import { ConfidenceDial } from "./ConfidenceDial";
 import { PnLByProductLine } from "./PnLByProductLine";
@@ -60,6 +61,10 @@ export function ManagerialDashboard() {
         </div>
 
         <PnLByProductLine pnl={pnlByProduct} />
+
+        {/* The plan is entered next to the report it feeds, and the report reloads on a successful write so
+            a newly-set budget is visible immediately rather than only on the next mount. */}
+        <BudgetEntry onSaved={() => budget.reload()} />
 
         <BudgetVariance variance={budget.data ?? EMPTY_BUDGET_VARIANCE} loading={budget.loading} />
       </section>

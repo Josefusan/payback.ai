@@ -11,6 +11,13 @@ const MIN = 0.8;
 const MAX = 0.99;
 const STEP = 0.01;
 
+/**
+ * The name written to the audit trail as the actor. Deliberately NOT the admin token: the trail is
+ * append-only and `GET /api/audit` is unauthenticated, so a secret written here could never be removed.
+ * Possession of the token is the only identity the dial has, so the honest answer is a role, not a value.
+ */
+const ACTOR = "dashboard operator";
+
 export const formatShape: FormatShape = {
   id: "confidence-dial",
   name: "ConfidenceDial",
@@ -85,7 +92,7 @@ export function ConfidenceDial({ setting: injected, sweep: injectedSweep, loadin
     setError(null);
     setSaved(null);
     try {
-      const written = await putThreshold(value, token.trim() || "dashboard", token);
+      const written = await putThreshold(value, ACTOR, token);
       setDraft(written.value);
       setSaved(`Set to ${formatProbability(written.value)}.`);
       // Re-read both, so the provenance line and the sweep reflect the value now in force.

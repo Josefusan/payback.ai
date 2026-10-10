@@ -5,10 +5,13 @@
  * cost line, so the tests that matter are the favourability ones and the sign convention they rest on.
  * A report that got either backwards would still produce plausible numbers and still render.
  */
+import { Hono } from "hono";
 import { beforeEach, describe, expect, it } from "vitest";
-import { budgetVariance, currentPeriod, periodBounds } from "./budget";
-import type { Env } from "./env";
+import { verifyAudit } from "./audit";
+import { budgetVariance, currentPeriod, isValidBudgetPeriod, periodBounds, setBudgetLine, validateBudgetWrite, type BudgetWrite } from "./budget";
+import type { AppEnv, Env } from "./env";
 import { resetTokenCache } from "./paypal";
+import { reports } from "./routes/reports";
 import { createLedgerDb, type TestD1 } from "./test-d1";
 
 const env = (db: TestD1): Env => ({ DB: db as unknown as Env["DB"] }) as unknown as Env;
@@ -157,5 +160,129 @@ describe("budgetVariance", () => {
     expect(totals.net.budget_cents).toBe(451000);
     expect(totals.net.variance_cents).toBe(-133000);
     expect(totals.net.favourable).toBe(false);
+  });
+});
+
+/* ─────────────────────────────────────────────────────── the budget write path */
+
+describe("setBudgetLine", () => {
+  /** A valid write, overridable per test. */
+  const write = (db: TestD1, over: Partial<BudgetWrite> = {}) =>
+    setBudgetLine(env(db), { period: "2026-10", account_code: "6100", amount_cents: 18000, by: "Joseph", ...over });
+
+  it("round-trips a written budget back into the variance report", async () => {
+    const db = createLedgerDb();
+    // 6200 (Advertising) has no seeded plan and no activity, so the only way it can appear is this write.
+    const result = await write(db, { account_code: "6200", amount_cents: 25000, note: "Ads" });
+    expect(result).toEqual({ ok: true, budget: { period: "2026-10", account_code: "6200", amount_cents: 25000, note: "Ads" } });
+
+    const row = (await budgetVariance(env(db), "2026-10")).rows.find((r) => r.account_code === "6200")!;
+    expect(row).toMatchObject({ budget_cents: 25000, actual_cents: 0, variance_cents: -25000, favourable: true });
+    expect(row.variance_pct).toBe(-100);
+  });
+
+  it("replaces a seeded line in place rather than duplicating it", async () => {
+    const db = createLedgerDb();
+    await write(db, { account_code: "6100", amount_cents: 18000 });
+
+    const rows = (await budgetVariance(env(db), "2026-10")).rows.filter((r) => r.account_code === "6100");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.budget_cents).toBe(18000); // the seed was 15000
+  });
+
+  it("appends a hash-chained audit row per write, and the chain still verifies", async () => {
+    const db = createLedgerDb();
+    await write(db, { account_code: "6100", amount_cents: 18000 });
+    await write(db, { account_code: "6100", amount_cents: 22000 });
+
+    const { results } = await db
+      .prepare(`SELECT ref_type, ref_id, event, actor, detail_json FROM audit_log ORDER BY seq`)
+      .all<{ ref_type: string; ref_id: string; event: string; actor: string; detail_json: string }>();
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({ ref_type: "setting", ref_id: "budget:2026-10:6100", event: "budget_set", actor: "Joseph" });
+    // The overwrite records the previous amount, so the change is visible rather than silent.
+    expect(JSON.parse(results[0]!.detail_json)).toMatchObject({ period: "2026-10", account_code: "6100", from: 15000, to: 18000 });
+    expect(JSON.parse(results[1]!.detail_json)).toMatchObject({ from: 18000, to: 22000 });
+    expect((await verifyAudit(env(db))).ok).toBe(true);
+  });
+
+  it("refuses a bad period / account / amount / actor with a stable code, and writes nothing", async () => {
+    const db = createLedgerDb();
+    expect(await write(db, { period: "2026-13" })).toEqual({ ok: false, error: "invalid_period" });
+    expect(await write(db, { period: "October" })).toEqual({ ok: false, error: "invalid_period" });
+    expect(await write(db, { account_code: "9999" })).toEqual({ ok: false, error: "invalid_account" }); // no such account
+    expect(await write(db, { account_code: "1010" })).toEqual({ ok: false, error: "invalid_account" }); // asset: never on a P&L report
+    expect(await write(db, { account_code: "" })).toEqual({ ok: false, error: "invalid_account" });
+    expect(await write(db, { amount_cents: -1 })).toEqual({ ok: false, error: "invalid_amount" });
+    expect(await write(db, { amount_cents: 1.5 })).toEqual({ ok: false, error: "invalid_amount" });
+    expect(await write(db, { amount_cents: Number.NaN })).toEqual({ ok: false, error: "invalid_amount" });
+    expect(await write(db, { amount_cents: "18000" })).toEqual({ ok: false, error: "invalid_amount" });
+    expect(await write(db, { by: "   " })).toEqual({ ok: false, error: "actor_required" });
+
+    // Every rejection above must be a no-op: nothing stored, nothing on the chain.
+    expect((await db.prepare(`SELECT COUNT(*) AS n FROM audit_log`).first<{ n: number }>())!.n).toBe(0);
+    expect((await db.prepare(`SELECT COUNT(*) AS n FROM budgets WHERE period = '2026-10'`).first<{ n: number }>())!.n).toBe(6); // the seed only
+  });
+
+  it("validates the period shape the same way the reader does", () => {
+    expect(isValidBudgetPeriod("2026-10")).toBe(true);
+    expect(isValidBudgetPeriod("2026-00")).toBe(false);
+    expect(isValidBudgetPeriod("2026-13")).toBe(false);
+    expect(validateBudgetWrite({ period: "2026-10", account_code: "4000", amount_cents: 0, by: "j" }).ok).toBe(true);
+  });
+});
+
+/* ───────────────────────────────────────────── the write path over HTTP (route) */
+
+describe("PUT /api/budgets", () => {
+  const ADMIN = "test-admin-token";
+  const routeEnv = (db: TestD1): Env => ({ DB: db as unknown as Env["DB"], ADMIN_TOKEN: ADMIN }) as unknown as Env;
+  const app = () => new Hono<AppEnv>().route("/", reports);
+
+  const put = (db: TestD1, body: unknown, token: string | null = ADMIN) =>
+    app().request(
+      "/api/budgets",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json", ...(token === null ? {} : { "x-admin-token": token }) },
+        body: typeof body === "string" ? body : JSON.stringify(body),
+      },
+      routeEnv(db),
+    );
+
+  it("returns the written line, and the report reflects it", async () => {
+    const db = createLedgerDb();
+    const res = await put(db, { period: "2026-10", account_code: "6100", amount_cents: 18000, by: "Joseph", note: "Software" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ period: "2026-10", account_code: "6100", amount_cents: 18000, note: "Software" });
+
+    const row = (await budgetVariance(env(db), "2026-10")).rows.find((r) => r.account_code === "6100")!;
+    expect(row.budget_cents).toBe(18000);
+  });
+
+  it("is admin-gated: a missing token is 401 and the budget is not written", async () => {
+    const db = createLedgerDb();
+    const res = await put(db, { period: "2026-10", account_code: "6200", amount_cents: 1, by: "Joseph" }, null);
+    expect(res.status).toBe(401);
+    expect((await budgetVariance(env(db), "2026-10")).rows.find((r) => r.account_code === "6200")).toBeUndefined();
+  });
+
+  it("answers 400 with a stable code for bad input, never 500", async () => {
+    const db = createLedgerDb();
+    const malformed = await put(db, "{not json");
+    expect(malformed.status).toBe(400);
+    expect(((await malformed.json()) as { error: string }).error).toBe("invalid_json");
+
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ period: "2026-13", account_code: "6100", amount_cents: 1, by: "x" }, "invalid_period"],
+      [{ period: "2026-10", account_code: "9999", amount_cents: 1, by: "x" }, "invalid_account"],
+      [{ period: "2026-10", account_code: "6100", amount_cents: -1, by: "x" }, "invalid_amount"],
+      [{ period: "2026-10", account_code: "6100", amount_cents: 1 }, "actor_required"],
+    ];
+    for (const [body, code] of cases) {
+      const res = await put(db, body);
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe(code);
+    }
   });
 });

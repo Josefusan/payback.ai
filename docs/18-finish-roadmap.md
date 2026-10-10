@@ -5,6 +5,31 @@ Written 2026-10-08. Submission window: **Thu Nov 12, 2026, 12:00 pm PT**. Judgin
 This is the plan to go from "the pipeline works" to "submitted, and credible to a management accountant".
 Ordered by what unblocks the most.
 
+> **Status update — 2026-10-11.** The sections below were written 2026-10-08 and are kept as written; where
+> the intervening build has overtaken them, the old text is struck through and marked *superseded* inline,
+> and the new state is recorded here. **This box is the authority; everything below it is history.**
+>
+> Built since 2026-10-08:
+>
+> - **§1.1 webhook → transaction mapping.** `handleSyncBatch` no longer ignores webhook events. A verified
+>   capture / refund / payout webhook is mapped to the same stored-row + enqueue path as `syncWindow`
+>   (`apps/worker/src/pipeline.ts` — `mapWebhookToTxn`, `processWebhookEvent`), so a capture books in seconds
+>   instead of waiting out Transaction Search's ~3h lag. A capture does one extra Orders v2 GET for the
+>   buyer's text (the injection guard's input); an order that cannot be read routes to a human rather than
+>   booking blind.
+> - **§1.5 hash-chained audit trail.** `apps/worker/migrations/0003_audit.sql`, `apps/worker/src/audit.ts`,
+>   `GET /api/audit` + `GET /api/audit/verify` (both live; `verify` → `{"ok":true}`), and an Audit trail
+>   screen. Each audit row is written in the same `DB.batch` as the mutation it records.
+> - **§1.6 autonomy dial.** `apps/worker/migrations/0004_settings.sql`, `GET|PUT /api/settings/auto_post_threshold`
+>   (clamped to `[0.80, 0.99]`), `GET /api/confidence/sweep`, and the `ConfidenceDial` widget on the
+>   managerial screen. The decision path reads the stored value (falling back to the `AUTO_POST_THRESHOLD`
+>   var); turning the dial writes a `setting` row to the audit chain in the same batch as the write.
+> - **§2.4 budget vs actual variance.** `apps/worker/migrations/0005_budgets.sql`, `GET /api/reports/budget-variance`,
+>   the `BudgetVariance` widget on the managerial screen, and a `BudgetEntry` form writing `PUT /api/budgets`
+>   (admin-gated; records a `setting` audit row in the same batch).
+>
+> Test state at this update: **197 worker tests, 119 web tests**, both typechecks clean.
+
 ---
 
 ## 0. Where we are
@@ -25,9 +50,10 @@ Working and verified against the live PayPal sandbox:
 
 Known gaps, in priority order:
 
-1. **`handleSyncBatch` ignores webhook events.** `pipeline.ts` has `// TODO: webhook events → map resource
+1. ~~**`handleSyncBatch` ignores webhook events.** `pipeline.ts` has `// TODO: webhook events → map resource
    to transaction`. Every webhook is verified and stored, then dropped. This is why booking depends on
-   Transaction Search, and therefore on its lag.
+   Transaction Search, and therefore on its lag.~~ **Superseded 2026-10-11 — see the status box above:
+   webhooks now map to transactions and a capture books in seconds.**
 2. **Transaction Search lags up to ~3h** on new sandbox activity. Nothing to fix, but it constrains the demo.
 3. **No managerial reporting** beyond a P&L by product line (see §2).
 4. **No dashboard** (`apps/web` exists; it is not wired to the worker).
@@ -55,14 +81,18 @@ the refund; `ledgerCents` must equal PayPal's `total_balance` with `pendingCents
 sandbox funds: the balance stayed 5,000.00 after three net-positive captures) should surface as a
 reconciliation *reason*, not silently. A management accountant needs to see held funds as held.
 
-**1.5 Build the hash-chained audit trail.** *Does not exist (see §2.7).* Add `audit_log` (seq, ref_type,
+**1.5 Build the hash-chained audit trail.** *Does not exist (see §2.7).* **DONE — superseded 2026-10-11:
+built as `0003_audit.sql`, `src/audit.ts`, `GET /api/audit` + `GET /api/audit/verify` and an Audit trail
+screen.** Add `audit_log` (seq, ref_type,
 ref_id, actor, detail_json, prev_hash, hash, created_at) as `0003_audit.sql`; append from every mutation —
 `postEntry`, `reverseEntry`, review resolve, action approve, settings change — with
 `hash = sha256(prev_hash ‖ canonical(row))`; expose `GET /api/audit` (`{events, story}`) and
 `GET /api/audit/verify` (`{ok, broken_at_seq}`); surface it in the dashboard with the verify result. A test
 must prove tampering is *detected*, not merely that the chain is written.
 
-**1.6 Build the autonomy dial.** *Does not exist (see §2.7).* Store the threshold in D1, expose
+**1.6 Build the autonomy dial.** *Does not exist (see §2.7).* **DONE — superseded 2026-10-11: built as
+`0004_settings.sql`, `GET|PUT /api/settings/auto_post_threshold`, `GET /api/confidence/sweep` and the
+`ConfidenceDial` widget.** Store the threshold in D1, expose
 `GET|PUT /api/settings/auto_post_threshold` (the contract already declares it; clamp to [0.80, 0.99]),
 have the decision path read it instead of the `AUTO_POST_THRESHOLD` var, write a settings change to the
 audit log (1.5), and add `GET /api/confidence/sweep` plus the `ConfidenceDial` widget. This is the
@@ -83,13 +113,19 @@ dimension set and have Clef fill it (it already returns `product_line` probabili
 **2.2 Contribution margin, not just revenue.** Split costs into **variable** (PayPal/merchant fees, COGS) and
 **fixed** (software, contractors) so the P&L yields contribution margin per product line and per customer,
 and a break-even point. Fees are already captured separately (`6050`), which is the hard part.
+**Partly DONE — superseded 2026-10-11:** contribution margin per product line is computed on the managerial
+dashboard (`PnLByProductLine`; `apps/web/src/data/reports.ts` `contribution_cents` / `contribution_margin_pct`);
+per-customer margin and a break-even point are not.
 
 **2.3 AR aging.** Invoices are seeded but not surfaced. Add an aging report (current / 30 / 60 / 90+) from
-`INVOICING.*` so overdue receivables are visible and the reminder action has a driver.
+`INVOICING.*` so overdue receivables are visible and the reminder action has a driver. **Superseded
+2026-10-11:** AR aging is surfaced — the `ARAgingWidget` on the managerial dashboard, derived from
+account-`1200` ledger lines (`apps/web/src/data/reports.ts` `deriveARAging`) rather than the `INVOICING.*` API.
 
 **2.4 Budget vs actual with variance.** A budget table per account per period, then variance in dollars and
 percent with an adverse/favourable flag. This is the single most-used management report and it is currently
-absent.
+absent. **DONE — superseded 2026-10-11: `0005_budgets.sql`, `GET /api/reports/budget-variance` and the
+`BudgetVariance` widget; the report is present.**
 
 **2.5 Cash-flow / working-capital view.** Opening balance, cash in, cash out, closing balance tied to PayPal,
 plus AR and AP positions. The tie-out already proves the hard half.
@@ -97,27 +133,32 @@ plus AR and AP positions. The tie-out already proves the hard half.
 **2.6 Close checklist.** `/api/close` already exists in the contract. Drive it from real checks: reconcile
 exact, no unresolved review items, no unposted settled transactions, AR aged, thresholds reviewed.
 
-**2.7 Controls a controller will look for.** Two of these exist and should be *showcased*; two do **not
-exist** and must be built — corrected 2026-10-09 after finding they were claimed here and in the README
-without any backing code:
+**2.7 Controls a controller will look for.** Two of these exist and should be *showcased*; two did **not
+exist** and had to be built — corrected 2026-10-09 after finding they were claimed here and in the README
+without any backing code (both were then built on 2026-10-11; the block below is marked):
 
 *Exist today:*
 - **Append-only ledger** enforced by SQLite triggers (`migrations/0002_journal_approver.sql`); corrections
   are reversals, never updates.
 - **Two keys for money movement** (INV-4) and deterministic policy caps no model can override (INV-3/policy).
 
-*Do NOT exist — build in §1.5 / §1.6 before the video promises them:*
-- **Hash-chained audit log** (`/api/audit`, `/api/audit/verify`). `routes/audit.ts` registers no route, both
-  endpoints 404, and there is no `audit_log` table. The planned `0002_audit.sql` was never written.
-- **Autonomy dial** (`/api/settings/auto_post_threshold` + confidence sweep). The endpoint 404s and no
-  source file references it; the threshold is the static `AUTO_POST_THRESHOLD` var.
+*~~Do NOT exist — build in §1.5 / §1.6 before the video promises them~~ **Exist as of 2026-10-11** — both
+were built; the 2026-10-08 text is kept struck through:*
+- ~~**Hash-chained audit log** (`/api/audit`, `/api/audit/verify`). `routes/audit.ts` registers no route, both
+  endpoints 404, and there is no `audit_log` table. The planned `0002_audit.sql` was never written.~~
+  **Built as `migrations/0003_audit.sql`; both endpoints return 200 and `verify` returns `{"ok":true}`.**
+- ~~**Autonomy dial** (`/api/settings/auto_post_threshold` + confidence sweep). The endpoint 404s and no
+  source file references it; the threshold is the static `AUTO_POST_THRESHOLD` var.~~
+  **Built as `migrations/0004_settings.sql` + `GET|PUT /api/settings/auto_post_threshold` + `GET /api/confidence/sweep`; the decision path reads the stored value and falls back to the var.**
 
-⚠️ **§6 steps 4 and 5 currently depend on both.** They cannot be recorded as written. Either build §1.5 and
-§1.6 first, or rewrite those beats — do not put them on camera in this state.
+~~⚠️ **§6 steps 4 and 5 currently depend on both.** They cannot be recorded as written. Either build §1.5 and
+§1.6 first, or rewrite those beats — do not put them on camera in this state.~~ **Superseded 2026-10-11:
+both are built, so §6 steps 4 and 5 are recordable.**
 
 Positioning line for the submission — **revised 2026-10-09**: the dial is cut, so the line no longer leans
 on it. *The agent does the bookkeeping; the audit trail and the hard caps are what make a controller willing
-to let it.*
+to let it.* **Superseded 2026-10-11: the dial is built, so the line may name it — *the agent does the
+bookkeeping; the audit trail, the hard caps and the autonomy dial are what make a controller let it.***
 
 ---
 
@@ -199,12 +240,14 @@ best fit.
 - **AG Grid** ($5,000 / $2,000 / 3 × $1,000) — the ledger and review grids. Highest cash, natural fit, and
   `apps/web` is already React.
 - **APIMatic** (3 × $1,000 + 6 months) — generate a typed PayPal client from PayPal's published OpenAPI spec.
-  Worth doing only if it is used in the product, not demoed as a curiosity.
+  Worth doing only if it is used in the product, not demoed as a curiosity. **Not used (2026-10-11): the
+  PayPal client is hand-written `fetch` (`apps/worker/src/paypal.ts`); no APIMatic-generated client is in the
+  build, so this prize is not targeted and this tool must not be listed as used.**
 - **Bryntum** (3 × $1,000) — Gantt/scheduler. Weak fit unless it becomes the close calendar.
 - **Channel3** ($1,500) — product data. Weak fit.
 
 Recommendation: commit to **AG Grid**. Add APIMatic only if the generated client genuinely replaces something
-we hand-wrote.
+we hand-wrote (not the case today — see above).
 
 ---
 
