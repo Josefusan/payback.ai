@@ -1,0 +1,115 @@
+name: CI
+
+# Three jobs, all of them real work:
+#   worker            — tsc --noEmit + vitest run via the app's own scripts
+#   web               — tsc --noEmit + the app's own `npm test` (NODE_ENV=test vitest run)
+#   rules-compliance   — the deterministic eval the rest of evals/ is built on (`python3 evals/checks.py`)
+#
+# NODE_ENV trap (README "Two traps worth knowing"): `npm install` / `npm ci` omit devDependencies when
+# NODE_ENV=production is set, which silently removes vitest, tsc and Playwright. CI therefore pins
+# NODE_ENV=test at the workflow level AND passes --include=dev on every install, so it cannot fall in.
+#
+# Node version: the README says Node >= 20, which is not enough for these suites today:
+#   * the worker suite imports `node:sqlite` through its test-only D1 shim (apps/worker/src/test-d1.ts),
+#     and Node 20 does not ship that module;
+#   * the web suite runs under jsdom, and jsdom declares
+#     engines.node: "^22.22.2 || ^24.15.0 || >=26.0.0" (npm prints EBADENGINE and carries on — nothing
+#     sets engine-strict — but the warning means the runtime is outside the supported range).
+# `"22"` resolves to the newest 22.x and satisfies both. Both suites were verified end to end on v22.22.0.
+#
+# Lockfiles: this repo has three of them and no workspace root install — `package-lock.json`,
+# `apps/worker/package-lock.json`, `apps/web/package-lock.json` (all lockfileVersion 3). `npm ci` is run
+# inside each app directory it belongs to. The root lockfile only carries `playwright` for
+# scripts/seed-sandbox.mjs, which CI does not exercise; if it ever does, the trap-free form is
+# `npm ci --include=dev` from the root.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_ENV: test
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker:
+    name: worker — typecheck + vitest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/worker/package-lock.json
+
+      - name: Install dependencies (devDependencies included explicitly)
+        run: npm ci --include=dev
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # `npm test` is `vitest run` in apps/worker/package.json — the project's own invocation.
+      # src/paypal.live.test.ts skips itself without sandbox credentials; that skip is expected.
+      - name: Test
+        run: npm test
+
+  web:
+    name: web — typecheck + vitest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies (devDependencies included explicitly)
+        run: npm ci --include=dev
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # `npm test` is `NODE_ENV=test vitest run` in apps/web/package.json; the script sets NODE_ENV
+      # itself, which matters because this suite asserts on behaviour that is test-mode dependent.
+      - name: Test
+        run: npm test
+
+  rules-compliance:
+    name: rules compliance — python3 evals/checks.py
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # evals/checks.py dates the project from the root commit (`git log --max-parents=0`), which a
+          # shallow clone cannot answer; with full history the `new_project` check reports a real result
+          # instead of the "no git history available" PENDING seen in the local artifact.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Stdlib only — no pip install step exists because the harness needs none (evals/README.md).
+      # Exit code is 0 unless a [HARD] check reports FAIL; the pending video requirement does not
+      # trip it, so green here is not the same as a complete submission (see docs/evidence.md).
+      # `--github OWNER/REPO` is deliberately NOT used: it needs the repo to be public, so in CI it
+      # would turn a real requirement into a network-dependent failure.
+      - name: Rules compliance checks
+        run: python3 evals/checks.py
