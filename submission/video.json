@@ -1,8 +1,8 @@
 {
-  "youtube_url": "PLACEHOLDER",
-  "duration_seconds": null,
-  "visibility": "not_uploaded",
-  "no_copyrighted_music": false,
-  "no_third_party_trademarks": false,
-  "shows_working_project": false
+  "youtube_url": "https://youtu.be/XJdyt3IlFwI",
+  "duration_seconds": 164,
+  "visibility": "public",
+  "no_copyrighted_music": true,
+  "no_third_party_trademarks": true,
+  "shows_working_project": true
 }

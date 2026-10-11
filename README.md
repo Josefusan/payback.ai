@@ -264,10 +264,13 @@ Every id it creates is appended to `docs/sandbox-activity.md`.
 
 ## Demo video
 
-PLACEHOLDER — not uploaded yet. The link and the YouTube URL in `submission/video.json` are filled in when
-the recording is published. (This line says PLACEHOLDER on purpose: the rules-compliance gate in
-`evals/checks.py` keys on that literal word, and it previously reported a passing video against a `_TODO_`
-that no video backed. An unearned green tick is worse than an honest pending one.)
+**[Payback.ai — demo, 2:44](https://youtu.be/XJdyt3IlFwI)**
+
+Every frame is rendered from a program rather than captured from a screen, so the film is
+reproducible — the same timestamp always produces the same frame. Every number, row and message in it
+is a real capture from the deployed worker (33 screenshots and 5 verbatim API responses), not a
+mock-up. No music bed, no third-party logo. The film carries no audio track: the captions are burned
+in, which the rules accept in place of a voiceover, so it reads correctly on mute.
 
 ## Repository map
 
