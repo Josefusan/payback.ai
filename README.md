@@ -264,13 +264,14 @@ Every id it creates is appended to `docs/sandbox-activity.md`.
 
 ## Demo video
 
-**[Payback.ai — demo, 2:44](https://youtu.be/XJdyt3IlFwI)**
+**[Payback.ai — demo, 2:44](https://youtu.be/s5G9Dvw1DhE)**
 
 Every frame is rendered from a program rather than captured from a screen, so the film is
 reproducible — the same timestamp always produces the same frame. Every number, row and message in it
 is a real capture from the deployed worker (33 screenshots and 5 verbatim API responses), not a
-mock-up. No music bed, no third-party logo. The film carries no audio track: the captions are burned
-in, which the rules accept in place of a voiceover, so it reads correctly on mute.
+mock-up. It is narrated: a voiceover over a music bed synthesised from oscillators, so the score is
+original and carries no third-party licence. Every line spoken is a line shown — the captions are burned
+in and agree with the voice, so it still reads correctly on mute. Loudness is normalised to -16 LUFS.
 
 ## Repository map
 
